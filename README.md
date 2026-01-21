@@ -1,6 +1,6 @@
 # AstraRP: 模块化智能体角色扮演流水线 (Modular Agent Pipeline for RP)
 
-**AstraRP** 是一个专为深度角色扮演（Role-Play）设计的下一代智能体架构。
+**AstraRP** 是一个基于 **[llama.cpp](https://github.com/ggml-org/llama.cpp.git)** 的，专为深度角色扮演（Role-Play）设计的下一代智能体架构。
 
 不同于传统的大型单体模型（Monolithic LLMs），AstraRP 采用 **“模型即算子”** 的设计哲学，将复杂的 RP 逻辑拆解为由多个微型模型（0.5B - 7B）构成的有向无环图（DAG）流水线。
 
