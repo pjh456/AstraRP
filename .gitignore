@@ -1,3 +1,5 @@
 .vscode/
-build/
 models/
+
+build/
+*/__pycache__
