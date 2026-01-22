@@ -1,7 +1,7 @@
 [project]
 name = "astra-dataset-tools"
-version = "0.2.1"
-dependencies = ["python-dotenv", "ollama"]
+version = "0.2.2"
+dependencies = ["python-dotenv", "ollama", "tqdm"]
 
 [build-system]
 requires = ["setuptools"]
