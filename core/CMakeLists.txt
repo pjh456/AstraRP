@@ -46,7 +46,7 @@ file(GLOB_RECURSE ASTRARP_HEADERS
     include/*.hpp
 )
 
-file(GLOB ASTRARP_SOURCES
+file(GLOB_RECURSE ASTRARP_SOURCES
     RELATIVE ${CMAKE_SOURCE_DIR}
     src/*.c
     src/*.cpp
