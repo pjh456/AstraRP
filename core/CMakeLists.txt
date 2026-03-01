@@ -41,27 +41,56 @@ add_subdirectory(${LLAMA_DIR})
 
 # 4. 添加可执行程序
 file(GLOB_RECURSE ASTRARP_HEADERS
-    RELATIVE ${CMAKE_SOURCE_DIR}
     include/*.h
     include/*.hpp
 )
 
 file(GLOB_RECURSE ASTRARP_SOURCES
-    RELATIVE ${CMAKE_SOURCE_DIR}
     src/*.c
     src/*.cpp
 )
 
-function(target_config TARGET HEADERS SRC)
-    add_executable(${TARGET} ${HEADERS} ${SRC})
-    target_link_libraries(${TARGET} PRIVATE
-        llama
-        common
-    )
-    target_include_directories(${TARGET} PRIVATE
-        ${CMAKE_SOURCE_DIR}/llama.cpp/include
-        ${CMAKE_SOURCE_DIR}/llama.cpp/common
-    )
-endfunction()
+# 创建一个静态库，方便 examples 链接
+add_library(astrarp_lib STATIC ${ASTRARP_SOURCES} ${ASTRARP_HEADERS})
 
-target_config(astra ${ASTRARP_HEADERS} ${ASTRARP_SOURCES})
+target_include_directories(astrarp_lib PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/common"
+)
+
+target_link_libraries(astrarp_lib PUBLIC llama common)
+
+add_executable(astra src/main.cpp)
+target_link_libraries(astra PRIVATE astrarp_lib)
+
+enable_testing()
+
+# 查找 examples 目录下所有的 cpp 文件
+file(GLOB EXAMPLE_SOURCES "examples/*.cpp")
+
+foreach(SOURCE_FILE ${EXAMPLE_SOURCES})
+    # 获取文件名（不带后缀）作为 Target 名称
+    get_filename_component(EXAMPLE_NAME ${SOURCE_FILE} NAME_WE)
+
+    # 定义 Target 名字，例如 test_xxx
+    set(TARGET_NAME "test_${EXAMPLE_NAME}")
+
+    # 创建可执行程序
+    # 使用 EXCLUDE_FROM_ALL 确保只有在手动构建它们或运行测试时才编译
+    add_executable(${TARGET_NAME} ${SOURCE_FILE})
+
+    # 链接到我们的核心库
+    target_link_libraries(${TARGET_NAME} PRIVATE astrarp_lib)
+
+    # 重点：仅在 Debug 模式下添加为测试用例
+    # 注意：CMAKE_BUILD_TYPE 在多配置生成器（如 VS）中可能为空，
+    # 这里使用逻辑：如果是 Debug 或者是多配置的 Debug 运行环境
+    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+
+    # (可选) 如果你只想在 Debug 模式下才编译这些 example
+    # 可以取消下面 if 的注释，但通常建议全部生成，仅在 Debug 下运行测试
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+    endif()
+endforeach()
