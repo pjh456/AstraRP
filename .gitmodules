@@ -1,3 +1,6 @@
 [submodule "core/llama.cpp"]
 	path = core/llama.cpp
 	url = https://github.com/ggml-org/llama.cpp.git
+[submodule "dataset_factory/chatbot_dataset_tools"]
+	path = dataset_factory/chatbot_dataset_tools
+	url = https://github.com/pjh456/chatbot_dataset_tools
