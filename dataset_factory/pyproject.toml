@@ -1,8 +1,0 @@
-[project]
-name = "astra-dataset-tools"
-version = "0.2.2"
-dependencies = ["python-dotenv", "ollama", "tqdm"]
-
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
