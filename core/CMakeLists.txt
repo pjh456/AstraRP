@@ -52,8 +52,8 @@ file(GLOB_RECURSE ASTRARP_SOURCES
     src/*.cpp
 )
 
-function(target_config TARGET SRC)
-    add_executable(${TARGET} ${SRC})
+function(target_config TARGET HEADERS SRC)
+    add_executable(${TARGET} ${HEADERS} ${SRC})
     target_link_libraries(${TARGET} PRIVATE
         llama
         common
@@ -64,4 +64,4 @@ function(target_config TARGET SRC)
     )
 endfunction()
 
-target_config(astra ${ASTRARP_SOURCES})
+target_config(astra ${ASTRARP_HEADERS} ${ASTRARP_SOURCES})
