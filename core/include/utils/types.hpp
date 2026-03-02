@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <memory>
 
 namespace astra_rp
@@ -15,6 +16,9 @@ namespace astra_rp
 
     template <typename K, typename V>
     using Map = std::map<K, V>;
+
+    template <typename K, typename V>
+    using HashMap = std::unordered_map<K, V>;
 
     template <typename T>
     using UniPtr = std::unique_ptr<T>;
