@@ -17,7 +17,7 @@ int main()
     astra_rp::Str path(std::getenv("LLAMA_MODEL_DIR"));
     std::cout << path << std::endl;
     astra_rp::Str name("test_model");
-    ModelParams params(name);
+    auto params = ModelParamsBuilder(name).use_mmap(true).build();
 
     auto model = manager.load(path, params);
     std::cout << "Model successfully loaded." << std::endl;
