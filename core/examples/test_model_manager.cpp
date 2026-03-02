@@ -9,7 +9,7 @@
 int main()
 {
     using namespace astra_rp::core;
-    std::cout << "Test started." << std::endl;
+    std::cout << "Model Test started." << std::endl;
 
     auto &manager = ModelManager::instance();
     std::cout << "Model Manager successfully initialized." << std::endl;
