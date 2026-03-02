@@ -10,10 +10,13 @@ namespace astra_rp
     namespace core
     {
         class ModelManager;
+        class ModelParams;
+        class ModelParamsBuilder;
 
         class ModelParams
         {
             friend class ModelManager;
+            friend class ModelParamsBuilder;
 
         private:
             llama_model_params m_params;
@@ -30,6 +33,42 @@ namespace astra_rp
 
             ModelParams(ModelParams &&) noexcept = default;
             ModelParams &operator=(ModelParams &&) noexcept = default;
+        };
+
+        class ModelParamsBuilder
+        {
+        private:
+            ModelParams m_params;
+
+        public:
+            ModelParamsBuilder(const Str &name) : m_params(name) {}
+
+            ModelParams build() const { return m_params; }
+
+        public:
+            ModelParamsBuilder &gpu_layers(int32_t n_layers)
+            {
+                m_params.m_params.n_gpu_layers = n_layers;
+                return *this;
+            }
+
+            ModelParamsBuilder &use_mmap(bool flag)
+            {
+                m_params.m_params.use_mmap = flag;
+                return *this;
+            }
+
+            ModelParamsBuilder &use_mlock(bool flag)
+            {
+                m_params.m_params.use_mlock = flag;
+                return *this;
+            }
+
+            ModelParamsBuilder &vocal_only(bool flag)
+            {
+                m_params.m_params.vocab_only = flag;
+                return *this;
+            }
         };
     }
 }
