@@ -26,11 +26,13 @@ else()
     # -O3: 最高级优化
     # -march=native: 让编译器针对你当前的 CPU 指令集进行全速优化
     # -flto: 开启链接时优化，减小体积并提升跨文件调用性能
-    add_compile_options(-O3 -march=native -mtune=native -flto=auto)
-    add_link_options(-flto)
+    # add_compile_options(-O3 -march=native -mtune=native -flto=auto)
+    # add_link_options(-flto)
 endif()
 
 # 3. 引入 llama.cpp 目录并开启内部优化开关
+set(LLAMA_HTTPLIB OFF CACHE BOOL "Disable llama.cpp httplib" FORCE)
+set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Disable llama.cpp examples" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Disable llama.cpp server" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Disable llama.cpp tests" FORCE)
@@ -38,6 +40,23 @@ set(GGML_NATIVE ON CACHE BOOL "Enable native optimization" FORCE)
 set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
 set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama.cpp)
 add_subdirectory(${LLAMA_DIR})
+
+# 注入环境变量
+file(STRINGS "${CMAKE_SOURCE_DIR}/.env" ENV_LINES)
+
+set(ENV_LIST)
+
+foreach(line IN LISTS ENV_LINES)
+    string(STRIP "${line}" line)
+
+    if(line STREQUAL "" OR line MATCHES "^#")
+        continue()
+    endif()
+
+    list(APPEND ENV_LIST "${line}")
+endforeach()
+
+# message(STATUS "Filtered envs: ${ENV_LIST}")
 
 # 4. 添加可执行程序
 file(GLOB_RECURSE ASTRARP_HEADERS
@@ -64,6 +83,12 @@ target_link_libraries(astrarp_lib PUBLIC llama common)
 add_executable(astra src/main.cpp)
 target_link_libraries(astra PRIVATE astrarp_lib)
 
+add_custom_command(TARGET astra POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:llama>
+    $<TARGET_FILE_DIR:astra>
+)
+
 enable_testing()
 
 # 查找 examples 目录下所有的 cpp 文件
@@ -73,8 +98,8 @@ foreach(SOURCE_FILE ${EXAMPLE_SOURCES})
     # 获取文件名（不带后缀）作为 Target 名称
     get_filename_component(EXAMPLE_NAME ${SOURCE_FILE} NAME_WE)
 
-    # 定义 Target 名字，例如 test_xxx
-    set(TARGET_NAME "test_${EXAMPLE_NAME}")
+    # 定义 Target 名字
+    set(TARGET_NAME "${EXAMPLE_NAME}")
 
     # 创建可执行程序
     # 使用 EXCLUDE_FROM_ALL 确保只有在手动构建它们或运行测试时才编译
@@ -88,9 +113,10 @@ foreach(SOURCE_FILE ${EXAMPLE_SOURCES})
     # 这里使用逻辑：如果是 Debug 或者是多配置的 Debug 运行环境
     add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
 
-    # (可选) 如果你只想在 Debug 模式下才编译这些 example
-    # 可以取消下面 if 的注释，但通常建议全部生成，仅在 Debug 下运行测试
-    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
-    endif()
+    # 只在 Debug 模式下才编译这些 example
+    # if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+    set_tests_properties(${TARGET_NAME} PROPERTIES ENVIRONMENT "${ENV_LIST}")
+
+    # endif()
 endforeach()
