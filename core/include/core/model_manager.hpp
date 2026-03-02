@@ -4,6 +4,7 @@
 #include <mutex>
 
 #include "utils/types.hpp"
+#include "core/init_manager.hpp"
 
 namespace astra_rp
 {
@@ -17,6 +18,9 @@ namespace astra_rp
         private:
             HashMap<Str, MulPtr<Model>> m_table;
             std::mutex m_mtx;
+
+        private:
+            InitManager &m_init_manager;
 
         public:
             static ModelManager &instance();

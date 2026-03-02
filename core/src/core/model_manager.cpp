@@ -1,6 +1,10 @@
 #include "core/model_manager.hpp"
+
 #include "core/model.hpp"
 #include "core/model_params.hpp"
+
+#include "core/init_manager.hpp"
+
 #include "llama.h"
 
 namespace astra_rp
@@ -14,14 +18,11 @@ namespace astra_rp
         }
 
         ModelManager::ModelManager()
+            : m_init_manager(InitManager::instance())
         {
-            llama_backend_init();
         }
 
-        ModelManager::~ModelManager()
-        {
-            llama_backend_free();
-        }
+        ModelManager::~ModelManager() {}
 
         MulPtr<Model> ModelManager::load(
             const Str &path, ModelParams params)
@@ -32,7 +33,7 @@ namespace astra_rp
             if (m_table.count(name))
                 return nullptr;
 
-            auto data = llama_load_model_from_file(
+            auto data = llama_model_load_from_file(
                 path.c_str(), params.m_params);
             if (!data)
                 return nullptr;
