@@ -38,7 +38,7 @@ namespace astra_rp
             BatchManager &operator=(BatchManager &&) noexcept = default;
 
         public:
-            MulPtr<Batch> acquire(int32_t required_tokens);
+            MulPtr<Batch> acquire(int32_t required_tokens, int32_t required_seqs = 1);
 
         private:
             void release(Batch *batch);

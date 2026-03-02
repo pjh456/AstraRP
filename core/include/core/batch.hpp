@@ -18,6 +18,7 @@ namespace astra_rp
         private:
             llama_batch m_batch;
             int32_t m_max_tokens;
+            int32_t m_max_seqs;
 
         private:
             Batch(int32_t max_tokens, int32_t max_seqs);
@@ -37,6 +38,7 @@ namespace astra_rp
 
         public:
             llama_batch raw() const noexcept { return m_batch; }
+            int32_t max_seqs() const noexcept { return m_max_seqs; }
             int32_t size() const noexcept { return m_batch.n_tokens; }
             int32_t capacity() const noexcept { return m_max_tokens; }
         };

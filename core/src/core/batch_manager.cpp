@@ -16,13 +16,16 @@ namespace astra_rp
 
         BatchManager::~BatchManager() = default;
 
-        MulPtr<Batch> BatchManager::acquire(int32_t required_tokens)
+        MulPtr<Batch> BatchManager::acquire(
+            int32_t required_tokens, int32_t required_seqs)
         {
             std::lock_guard<std::mutex> lock(m_mtx);
 
             for (auto it = m_pool.begin(); it != m_pool.end(); ++it)
             {
                 if ((*it)->capacity() < required_tokens)
+                    continue;
+                if ((*it)->max_seqs() < required_seqs)
                     continue;
 
                 auto batch_ptr = std::move(*it);
@@ -36,7 +39,7 @@ namespace astra_rp
             }
 
             int32_t alloc_size = (required_tokens <= 512) ? 512 : required_tokens;
-            auto *new_batch = new Batch(alloc_size, 1); // TODO: 把这个 1 改掉
+            auto *new_batch = new Batch(alloc_size, required_seqs);
 
             return std::shared_ptr<Batch>(
                 new_batch,
