@@ -33,6 +33,9 @@ namespace astra_rp
 
             ModelParams(ModelParams &&) noexcept = default;
             ModelParams &operator=(ModelParams &&) noexcept = default;
+
+        public:
+            llama_model_params raw() const noexcept { return m_params; }
         };
 
         class ModelParamsBuilder
