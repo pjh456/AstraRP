@@ -19,6 +19,35 @@ namespace astra_rp
                 llama_batch_free(m_batch);
         }
 
+        Batch::Batch(Batch &&other) noexcept
+            : m_batch(other.m_batch),
+              m_max_tokens(other.m_max_tokens),
+              m_max_seqs(other.m_max_seqs)
+        {
+            other.m_batch = {0};
+            other.m_max_tokens = 0;
+            other.m_max_seqs = 0;
+        }
+
+        Batch &Batch::operator=(Batch &&other) noexcept
+        {
+            if (this == &other)
+                return *this;
+
+            if (m_batch.token)
+                llama_batch_free(m_batch);
+
+            m_batch = other.m_batch;
+            m_max_tokens = other.m_max_tokens;
+            m_max_seqs = other.m_max_seqs;
+
+            other.m_batch = {0};
+            other.m_max_tokens = 0;
+            other.m_max_seqs = 0;
+
+            return *this;
+        }
+
         void Batch::add(
             Token id,
             int32_t pos,

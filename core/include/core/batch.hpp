@@ -29,8 +29,8 @@ namespace astra_rp
             Batch(const Batch &) = delete;
             Batch operator=(const Batch &) = delete;
 
-            Batch(Batch &&) noexcept = delete;
-            Batch &operator=(Batch &&) noexcept = delete;
+            Batch(Batch &&) noexcept;
+            Batch &operator=(Batch &&) noexcept;
 
         public:
             void add(Token id, int32_t pos, const Vec<int32_t> &seq_ids, bool logits);
