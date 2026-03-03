@@ -38,6 +38,7 @@ namespace astra_rp
                     { this->release(b); });
             }
 
+            // TODO: 动态调整以避免内存碎片
             int32_t alloc_size = (required_tokens <= 512) ? 512 : required_tokens;
             auto *new_batch = new Batch(alloc_size, required_seqs);
 
