@@ -1,6 +1,10 @@
 #include "core/init_manager.hpp"
 
+#include <string>
+
 #include "llama.h"
+
+#include "utils/logger.hpp"
 
 namespace astra_rp
 {
@@ -30,10 +34,22 @@ namespace astra_rp
                 const char *text,
                 void *user_data)
         {
-            // 直接忽略所有日志内容
-            (void)level;
-            (void)text;
-            (void)user_data;
+            // 过滤掉 llama.cpp 日志中的换行符
+            std::string msg(text);
+            if (!msg.empty() && msg.back() == '\n')
+                msg.pop_back();
+
+            switch (level)
+            {
+            case GGML_LOG_LEVEL_ERROR:
+                ASTRA_LOG_ERROR("LLAMA: " + msg);
+                break;
+            case GGML_LOG_LEVEL_WARN:
+                ASTRA_LOG_WARN("LLAMA: " + msg);
+                break;
+            default:
+                break; // 忽略其他 INFO/DEBUG
+            }
         }
     }
 }
