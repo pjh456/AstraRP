@@ -12,7 +12,7 @@ namespace astra_rp
         Model::~Model()
         {
             if (m_model)
-                llama_free_model(m_model);
+                llama_model_free(m_model);
         }
     }
 }
