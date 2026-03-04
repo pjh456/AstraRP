@@ -19,6 +19,10 @@ namespace astra_rp
         {
             std::lock_guard<std::mutex> lock(m_mtx);
 
+            auto deleter =
+                [this](Batch *b)
+            { this->release(b); };
+
             for (auto it = m_pool.begin(); it != m_pool.end(); ++it)
             {
                 if ((*it)->capacity() < required_tokens)
@@ -31,9 +35,7 @@ namespace astra_rp
                 batch_ptr->clear();
 
                 return std::shared_ptr<Batch>(
-                    batch_ptr.release(),
-                    [this](Batch *b)
-                    { this->release(b); });
+                    batch_ptr.release(), deleter);
             }
 
             // 向上取整复用
@@ -41,12 +43,11 @@ namespace astra_rp
             while (alloc_size < required_tokens)
                 alloc_size *= 2;
 
-            auto *new_batch = new Batch(alloc_size, required_seqs);
+            auto *new_batch =
+                new Batch(alloc_size, required_seqs);
 
             return std::shared_ptr<Batch>(
-                new_batch,
-                [this](Batch *b)
-                { this->release(b); });
+                new_batch, deleter);
         }
 
         void BatchManager::release(Batch *batch)
