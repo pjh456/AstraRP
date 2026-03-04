@@ -3,8 +3,6 @@
 #include <cassert>
 
 #include "core/model_manager.hpp"
-#include "core/model.hpp"
-#include "core/model_params.hpp"
 
 int main()
 {
