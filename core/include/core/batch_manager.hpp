@@ -2,7 +2,6 @@
 #define INCLUDE_ASTRA_RP_BATCH_MANAGER_HPP
 
 #include <mutex>
-#include <list>
 
 #include "utils/types.hpp"
 #include "core/batch.hpp"
@@ -16,7 +15,7 @@ namespace astra_rp
         {
         private:
             std::mutex m_mtx;
-            std::list<UniPtr<Batch>> m_pool;
+            List<UniPtr<Batch>> m_pool;
 
         private:
             InitManager &m_init_manager;

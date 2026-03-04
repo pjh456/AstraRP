@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 #include <unordered_map>
 #include <memory>
@@ -14,6 +15,9 @@ namespace astra_rp
 
     template <typename T>
     using Vec = std::vector<T>;
+
+    template <typename T>
+    using List = std::list<T>;
 
     template <typename K, typename V>
     using Map = std::map<K, V>;
