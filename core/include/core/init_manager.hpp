@@ -1,6 +1,8 @@
 #ifndef INCLUDE_ASTRA_RP_INIT_MANAGER_HPP
 #define INCLUDE_ASTRA_RP_INIT_MANAGER_HPP
 
+#include "ggml.h"
+
 namespace astra_rp
 {
     namespace core
@@ -20,6 +22,12 @@ namespace astra_rp
 
             InitManager(InitManager &&) noexcept = default;
             InitManager &operator=(InitManager &&) noexcept = default;
+
+        private:
+            static void llama_empty_log_callback(
+                ggml_log_level level,
+                const char *text,
+                void *user_data);
         };
     }
 }
