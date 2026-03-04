@@ -7,11 +7,8 @@ namespace astra_rp
     namespace core
     {
         Batch::Batch(int32_t max_tokens, int32_t max_seqs)
-            : m_max_tokens(max_tokens), m_max_seqs(max_seqs)
-        {
-            m_batch = {0};
-            m_batch = llama_batch_init(max_tokens, 0, max_seqs);
-        }
+            : m_batch(llama_batch_init(max_tokens, 0, max_seqs)),
+              m_max_tokens(max_tokens), m_max_seqs(max_seqs) {}
 
         Batch::~Batch()
         {

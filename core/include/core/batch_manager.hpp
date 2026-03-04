@@ -1,19 +1,17 @@
 #ifndef INCLUDE_ASTRA_RP_BATCH_MANAGER_HPP
 #define INCLUDE_ASTRA_RP_BATCH_MANAGER_HPP
 
-#include "utils/types.hpp"
-
-#include "core/init_manager.hpp"
-
 #include <mutex>
 #include <list>
+
+#include "utils/types.hpp"
+#include "core/batch.hpp"
+#include "core/init_manager.hpp"
 
 namespace astra_rp
 {
     namespace core
     {
-        class Batch;
-
         class BatchManager
         {
         private:

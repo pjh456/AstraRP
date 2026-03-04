@@ -1,7 +1,5 @@
 #include "core/batch_manager.hpp"
 
-#include "core/batch.hpp"
-
 namespace astra_rp
 {
     namespace core
@@ -38,8 +36,11 @@ namespace astra_rp
                     { this->release(b); });
             }
 
-            // TODO: 动态调整以避免内存碎片
-            int32_t alloc_size = (required_tokens <= 512) ? 512 : required_tokens;
+            // 向上取整复用
+            int32_t alloc_size = 512;
+            while (alloc_size < required_tokens)
+                alloc_size *= 2;
+
             auto *new_batch = new Batch(alloc_size, required_seqs);
 
             return std::shared_ptr<Batch>(
