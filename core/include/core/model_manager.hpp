@@ -4,15 +4,14 @@
 #include <mutex>
 
 #include "utils/types.hpp"
+#include "core/model.hpp"
+#include "core/model_params.hpp"
 #include "core/init_manager.hpp"
 
 namespace astra_rp
 {
     namespace core
     {
-        class Model;
-        class ModelParams;
-
         class ModelManager
         {
         private:
@@ -20,7 +19,7 @@ namespace astra_rp
             std::mutex m_mtx;
 
         private:
-            InitManager &m_init_manager;
+            InitManager &m_init;
 
         public:
             static ModelManager &instance();

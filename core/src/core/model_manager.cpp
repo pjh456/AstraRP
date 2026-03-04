@@ -1,10 +1,5 @@
 #include "core/model_manager.hpp"
 
-#include "core/model.hpp"
-#include "core/model_params.hpp"
-
-#include "core/init_manager.hpp"
-
 #include "llama.h"
 
 namespace astra_rp
@@ -18,9 +13,7 @@ namespace astra_rp
         }
 
         ModelManager::ModelManager()
-            : m_init_manager(InitManager::instance())
-        {
-        }
+            : m_init(InitManager::instance()) {}
 
         ModelManager::~ModelManager() {}
 
