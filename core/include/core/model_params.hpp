@@ -23,8 +23,11 @@ namespace astra_rp
             Str m_name;
 
         public:
-            ModelParams(const Str &name, llama_model_params params);
-            ModelParams(const Str &name);
+            ModelParams(const Str &name, llama_model_params params)
+                : m_name(name), m_params(params) {}
+
+            ModelParams(const Str &name)
+                : ModelParams(name, llama_model_default_params()) {}
 
             ~ModelParams() = default;
 
