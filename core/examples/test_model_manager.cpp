@@ -9,6 +9,7 @@
 
 #include "core/model_manager.hpp"
 #include "utils/logger.hpp"
+#include "core/tokenizer.hpp"
 
 using namespace astra_rp;
 using namespace astra_rp::core;
@@ -23,12 +24,12 @@ void test_basic_conversion(MulPtr<Model> model)
     Str input = "Hello world";
 
     // 不添加 BOS，只做纯文本转换
-    auto tokens = model->tokenize(input, false, false);
+    auto tokens = Tokenizer::tokenize(model, input, false, false);
 
     assert(!tokens.empty());
     ASTRA_LOG_ERROR("Tokenized size: " + std::to_string(tokens.size()));
 
-    Str output = model->detokenize(tokens, false, false);
+    Str output = Tokenizer::detokenize(model, tokens, false, false);
 
     // 注意：Llama 模型可能会在单词前加空格，或者输入本身就是从空格开始
     // 这里我们主要验证输出不为空，且包含原意
@@ -51,11 +52,11 @@ void test_utf8_roundtrip(MulPtr<Model> model)
     Str input = "你好，世界！ Hello. テスト 🚀";
 
     // Step 1: Tokenize (不加 BOS 以便严格比对字符串)
-    auto tokens = model->tokenize(input, false, false);
+    auto tokens = Tokenizer::tokenize(model, input, false, false);
     assert(tokens.size() > 0);
 
     // Step 2: Detokenize
-    Str output = model->detokenize(tokens, false, false);
+    Str output = Tokenizer::detokenize(model, tokens, false, false);
 
     ASTRA_LOG_INFO("UTF-8 Input:  " + input);
     ASTRA_LOG_INFO("UTF-8 Output: " + output);
@@ -96,10 +97,10 @@ void test_special_tokens(MulPtr<Model> model)
     Str text = "Test";
 
     // Case A: 不加 Special
-    auto tokens_plain = model->tokenize(text, false, false);
+    auto tokens_plain = Tokenizer::tokenize(model, text, false, false);
 
     // Case B: 加 Special (通常是 BOS)
-    auto tokens_special = model->tokenize(text, true, true);
+    auto tokens_special = Tokenizer::tokenize(model, text, true, true);
 
     ASTRA_LOG_INFO("Plain size: " + std::to_string(tokens_plain.size()));
     ASTRA_LOG_INFO("Special size: " + std::to_string(tokens_special.size()));
@@ -122,12 +123,12 @@ void test_special_tokens(MulPtr<Model> model)
 void test_edge_cases(MulPtr<Model> model)
 {
     // Case A: 空字符串
-    auto tokens = model->tokenize("", false, false);
+    auto tokens = Tokenizer::tokenize(model, "", false, false);
     assert(tokens.empty());
     ASTRA_LOG_INFO("Empty string tokenized to empty vector.");
 
     // Case B: 空 Vector
-    auto str = model->detokenize({}, false, false);
+    auto str = Tokenizer::detokenize(model, {}, false, false);
     assert(str.empty());
     ASTRA_LOG_INFO("Empty vector detokenized to empty string.");
 
@@ -145,10 +146,10 @@ void test_long_text(MulPtr<Model> model)
     }
     long_text += "End.";
 
-    auto tokens = model->tokenize(long_text, false, false);
+    auto tokens = Tokenizer::tokenize(model, long_text, false, false);
     assert(tokens.size() > 100);
 
-    auto output = model->detokenize(tokens, false, false);
+    auto output = Tokenizer::detokenize(model, tokens, false, false);
 
     // 验证重建后的文本长度接近原文本
     assert(output.size() >= long_text.size() * 0.9); // 允许少量的归一化差异
