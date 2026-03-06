@@ -120,7 +120,17 @@ namespace astra_rp
     }
 }
 
-#ifndef ASTRA_IGNORE_LOG
+#ifdef ASTRA_IGNORE_LOG
+#define ASTRA_LOG(level, msg)
+#elif defined ASTRA_SIMPLE_LOG
+#define ASTRA_LOG(level, msg)                                                  \
+    do                                                                         \
+    {                                                                          \
+        std::ostringstream oss;                                                \
+        oss << msg;                                                            \
+        astra_rp::utils::Logger::print(level, "Ignored", __LINE__, oss.str()); \
+    } while (0)
+#else
 #define ASTRA_LOG(level, msg)                                                 \
     do                                                                        \
     {                                                                         \
@@ -128,9 +138,7 @@ namespace astra_rp
         oss << msg;                                                           \
         astra_rp::utils::Logger::print(level, __FILE__, __LINE__, oss.str()); \
     } while (0)
-#else
-#define ASTRA_LOG(level, msg)
-#endif // ASTRA_IGNORE_LOG
+#endif // ASTRA_LOG
 
 #define ASTRA_LOG_DEBUG(msg) ASTRA_LOG(astra_rp::utils::LogLevel::DEBUG, msg)
 #define ASTRA_LOG_INFO(msg) ASTRA_LOG(astra_rp::utils::LogLevel::INFO, msg)
