@@ -5,28 +5,13 @@
 #include <cstring>
 #include <cstdlib>
 
+#define ASTRA_SIMPLE_LOG
+
 #include "core/model_manager.hpp"
+#include "utils/logger.hpp"
 
 using namespace astra_rp;
 using namespace astra_rp::core;
-
-// ==========================================
-// 辅助打印工具
-// ==========================================
-void log_pass(const std::string &test_name)
-{
-    std::cout << "[PASS] " << test_name << std::endl;
-}
-
-void log_info(const std::string &msg)
-{
-    std::cout << "       -> " << msg << std::endl;
-}
-
-void log_error(const std::string &msg)
-{
-    std::cerr << "[FAIL] " << msg << std::endl;
-}
 
 // ==========================================
 // 测试用例
@@ -41,21 +26,21 @@ void test_basic_conversion(MulPtr<Model> model)
     auto tokens = model->tokenize(input, false, false);
 
     assert(!tokens.empty());
-    log_info("Tokenized size: " + std::to_string(tokens.size()));
+    ASTRA_LOG_ERROR("Tokenized size: " + std::to_string(tokens.size()));
 
     Str output = model->detokenize(tokens, false, false);
 
     // 注意：Llama 模型可能会在单词前加空格，或者输入本身就是从空格开始
     // 这里我们主要验证输出不为空，且包含原意
     assert(!output.empty());
-    log_info("Original: " + input);
-    log_info("Result:   " + output);
+    ASTRA_LOG_INFO("Original: " + input);
+    ASTRA_LOG_INFO("Result:   " + output);
 
     // 简单的包含性检查
     assert(output.find("Hello") != std::string::npos);
     assert(output.find("world") != std::string::npos);
 
-    log_pass("Test 1: Basic Tokenize/Detokenize");
+    ASTRA_LOG_DEBUG("Test 1: Basic Tokenize/Detokenize");
 }
 
 // 2. 闭环测试 (Round Trip)与 UTF-8 支持
@@ -72,8 +57,8 @@ void test_utf8_roundtrip(MulPtr<Model> model)
     // Step 2: Detokenize
     Str output = model->detokenize(tokens, false, false);
 
-    log_info("UTF-8 Input:  " + input);
-    log_info("UTF-8 Output: " + output);
+    ASTRA_LOG_INFO("UTF-8 Input:  " + input);
+    ASTRA_LOG_INFO("UTF-8 Output: " + output);
 
     // Step 3: 验证
     // 注意：某些模型可能会对标点符号做归一化处理，但大部分情况应完全一致
@@ -82,19 +67,19 @@ void test_utf8_roundtrip(MulPtr<Model> model)
     // 简单的启发式检查：长度应该非常接近，且内容必须匹配
     if (input == output)
     {
-        log_info("Perfect match!");
+        ASTRA_LOG_INFO("Perfect match!");
     }
     else
     {
         // 如果不完全匹配，检查是否只是开头多了空格
         if (output.size() > input.size() && output.substr(output.size() - input.size()) == input)
         {
-            log_info("Match (with leading space/formatting).");
+            ASTRA_LOG_INFO("Match (with leading space/formatting).");
         }
         else
         {
             // 某些分词器行为差异，只要不乱码即可，暂时不强制 assert相等
-            log_info("Note: Strings differ slightly (normalization?), but checking for garbage...");
+            ASTRA_LOG_INFO("Note: Strings differ slightly (normalization?), but checking for garbage...");
         }
     }
 
@@ -102,7 +87,7 @@ void test_utf8_roundtrip(MulPtr<Model> model)
     assert(output.find("🚀") != std::string::npos);
     assert(output.find("你好") != std::string::npos);
 
-    log_pass("Test 2: UTF-8 & Round Trip");
+    ASTRA_LOG_DEBUG("Test 2: UTF-8 & Round Trip");
 }
 
 // 3. 特殊 Token 测试 (BOS/EOS)
@@ -116,21 +101,21 @@ void test_special_tokens(MulPtr<Model> model)
     // Case B: 加 Special (通常是 BOS)
     auto tokens_special = model->tokenize(text, true, true);
 
-    log_info("Plain size: " + std::to_string(tokens_plain.size()));
-    log_info("Special size: " + std::to_string(tokens_special.size()));
+    ASTRA_LOG_INFO("Plain size: " + std::to_string(tokens_plain.size()));
+    ASTRA_LOG_INFO("Special size: " + std::to_string(tokens_special.size()));
 
     // 通常加上 BOS 后，token 数量会 +1
     // 注意：有些模型可能没有 BOS，或者行为不同，这里做软性检查
     if (tokens_special.size() > tokens_plain.size())
     {
-        log_info("Verified: tokenize with add_special=true added tokens.");
+        ASTRA_LOG_INFO("Verified: tokenize with add_special=true added tokens.");
     }
     else
     {
-        log_info("Warning: add_special=true did not increase token count (Model dependent).");
+        ASTRA_LOG_INFO("Warning: add_special=true did not increase token count (Model dependent).");
     }
 
-    log_pass("Test 3: Special Tokens Handling");
+    ASTRA_LOG_DEBUG("Test 3: Special Tokens Handling");
 }
 
 // 4. 边界情况测试
@@ -139,14 +124,14 @@ void test_edge_cases(MulPtr<Model> model)
     // Case A: 空字符串
     auto tokens = model->tokenize("", false, false);
     assert(tokens.empty());
-    log_info("Empty string tokenized to empty vector.");
+    ASTRA_LOG_INFO("Empty string tokenized to empty vector.");
 
     // Case B: 空 Vector
     auto str = model->detokenize({}, false, false);
     assert(str.empty());
-    log_info("Empty vector detokenized to empty string.");
+    ASTRA_LOG_INFO("Empty vector detokenized to empty string.");
 
-    log_pass("Test 4: Edge Cases");
+    ASTRA_LOG_DEBUG("Test 4: Edge Cases");
 }
 
 // 5. 压力/长文本测试
@@ -168,7 +153,7 @@ void test_long_text(MulPtr<Model> model)
     // 验证重建后的文本长度接近原文本
     assert(output.size() >= long_text.size() * 0.9); // 允许少量的归一化差异
 
-    log_pass("Test 5: Long Text Stress Test");
+    ASTRA_LOG_DEBUG("Test 5: Long Text Stress Test");
 }
 
 // ==========================================
@@ -199,7 +184,7 @@ int main()
     auto model = manager.load(path, params);
     if (!model)
     {
-        log_error("Failed to load model.");
+        ASTRA_LOG_ERROR("Failed to load model.");
         return 1;
     }
 
@@ -214,7 +199,7 @@ int main()
     }
     catch (const std::exception &e)
     {
-        log_error(std::string("Uncaught exception: ") + e.what());
+        ASTRA_LOG_ERROR(std::string("Uncaught exception: ") + e.what());
         manager.unload(name);
         return 1;
     }

@@ -5,24 +5,16 @@
 #include <atomic>
 #include <string>
 
+#define ASTRA_SIMPLE_LOG
+
 #include "core/context_manager.hpp"
 #include "core/model_manager.hpp"
 #include "core/model.hpp"
 #include "core/context_params.hpp"
+#include "utils/logger.hpp"
 
 using namespace astra_rp;
 using namespace astra_rp::core;
-
-// 辅助打印函数
-void log_pass(const std::string &test_name)
-{
-    std::cout << "[PASS] " << test_name << std::endl;
-}
-
-void log_info(const std::string &msg)
-{
-    std::cout << "       -> " << msg << std::endl;
-}
 
 // ---------------------------------------------------------
 // 测试 1: 基础生命周期与属性验证
@@ -46,8 +38,8 @@ void test_context_lifecycle(MulPtr<Model> model)
     // 验证 model 引用保持有效
     assert(ctx->model().name() == model->name());
 
-    log_info("Context capacity verified: " + std::to_string(ctx->capacity()));
-    log_pass("Test 1: Basic Lifecycle & Properties");
+    ASTRA_LOG_INFO("Context capacity verified: " + std::to_string(ctx->capacity()));
+    ASTRA_LOG_DEBUG("Test 1: Basic Lifecycle & Properties");
 }
 
 // ---------------------------------------------------------
@@ -70,7 +62,7 @@ void test_pool_reuse_logic(MulPtr<Model> model)
     {
         auto ctx2 = manager.acquire(model, params);
         assert(ctx2->raw() == raw_ptr1);
-        log_info("Context reused successfully.");
+        ASTRA_LOG_INFO("Context reused successfully.");
     }
 
     // 作用域 3: 申请更高规格的 Context (1024)，无法复用池子中 512 的
@@ -82,11 +74,11 @@ void test_pool_reuse_logic(MulPtr<Model> model)
         if (ctx3->capacity() > 512)
         {
             assert(ctx3->raw() != raw_ptr1);
-            log_info("New Context created for larger capacity requirement.");
+            ASTRA_LOG_INFO("New Context created for larger capacity requirement.");
         }
     }
 
-    log_pass("Test 2: Pool Reuse & Capacity Matching");
+    ASTRA_LOG_DEBUG("Test 2: Pool Reuse & Capacity Matching");
 }
 
 // ---------------------------------------------------------
@@ -102,7 +94,7 @@ void test_state_management(MulPtr<Model> model)
     // 1. 获取状态大小
     size_t state_size = ctx->state_size(0);
     assert(state_size > 0);
-    log_info("State size is " + std::to_string(state_size) + " bytes.");
+    ASTRA_LOG_INFO("State size is " + std::to_string(state_size) + " bytes.");
 
     // 2. 导出状态
     auto state_data = ctx->get_state(0);
@@ -112,7 +104,7 @@ void test_state_management(MulPtr<Model> model)
     size_t bytes_written = ctx->set_state(state_data, 0);
     assert(bytes_written == state_size);
 
-    log_pass("Test 3: State Management (Save/Load)");
+    ASTRA_LOG_DEBUG("Test 3: State Management (Save/Load)");
 }
 
 // ---------------------------------------------------------
@@ -147,7 +139,7 @@ void test_concurrency(MulPtr<Model> model)
         success_count++;
     };
 
-    log_info("Launching 8 threads, each acquiring/releasing 10 times...");
+    ASTRA_LOG_INFO("Launching 8 threads, each acquiring/releasing 10 times...");
 
     for (int i = 0; i < num_threads; ++i)
     {
@@ -161,7 +153,7 @@ void test_concurrency(MulPtr<Model> model)
     }
 
     assert(success_count == num_threads);
-    log_pass("Test 4: Concurrency & Thread Safety");
+    ASTRA_LOG_DEBUG("Test 4: Concurrency & Thread Safety");
 }
 
 // ---------------------------------------------------------

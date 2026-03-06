@@ -6,6 +6,8 @@
 #include <future>
 #include <atomic>
 
+#define ASTRA_SIMPLE_LOG
+
 // ==========================================
 // HACK: 为了单独测试 Batch 的移动语义，
 // 暂时将 private 成员暴露出来。
@@ -15,20 +17,10 @@
 #include "core/batch.hpp"
 #include "core/batch_manager.hpp"
 #undef private
-// ==========================================
+
+#include "utils/logger.hpp"
 
 using namespace astra_rp::core;
-
-// 辅助打印函数
-void log_pass(const std::string &test_name)
-{
-    std::cout << "[PASS] " << test_name << std::endl;
-}
-
-void log_info(const std::string &msg)
-{
-    std::cout << "       -> " << msg << std::endl;
-}
 
 // ---------------------------------------------------------
 // 测试 1: Batch 类的移动语义 (Move Semantics)
@@ -58,7 +50,7 @@ void test_batch_move_semantics()
         // b1 析构时不会 crash (因为 token 为 nullptr)
         // b2 析构时会释放 original_token_ptr
     }
-    log_info("Move Constructor verified.");
+    ASTRA_LOG_INFO("Move Constructor verified.");
 
     {
         // 测试移动赋值
@@ -86,9 +78,9 @@ void test_batch_move_semantics()
         (*b4_ptr) = std::move(b4);
         assert(b4.raw().token == ptr_b3); // 应该保持不变
     }
-    log_info("Move Assignment verified.");
+    ASTRA_LOG_INFO("Move Assignment verified.");
 
-    log_pass("Test 1: Batch Move Semantics & RAII");
+    ASTRA_LOG_DEBUG("Test 1: Batch Move Semantics & RAII");
 }
 
 // ---------------------------------------------------------
@@ -116,7 +108,7 @@ void test_data_integrity()
     assert(raw.seq_id[0][1] == 20);
     assert(raw.seq_id[0][2] == 30);
 
-    log_pass("Test 2: Data Integrity & Multi-Sequence support");
+    ASTRA_LOG_DEBUG("Test 2: Data Integrity & Multi-Sequence support");
 }
 
 // ---------------------------------------------------------
@@ -155,7 +147,7 @@ void test_pool_reuse_logic()
         assert(b3->capacity() >= 1024);
     }
 
-    log_pass("Test 3: Pool Reuse & Capacity Matching");
+    ASTRA_LOG_DEBUG("Test 3: Pool Reuse & Capacity Matching");
 }
 
 // ---------------------------------------------------------
@@ -176,7 +168,7 @@ void test_boundaries()
     catch (const std::runtime_error &e)
     {
         assert(std::string(e.what()).find("Batch token capacity exceeded") != std::string::npos);
-        log_info("Caught expected token overflow exception.");
+        ASTRA_LOG_INFO("Caught expected token overflow exception.");
     }
 
     batch->clear();
@@ -195,10 +187,10 @@ void test_boundaries()
     catch (const std::runtime_error &e)
     {
         assert(std::string(e.what()).find("Batch sequence capacity exceeded") != std::string::npos);
-        log_info("Caught expected sequence overflow exception.");
+        ASTRA_LOG_INFO("Caught expected sequence overflow exception.");
     }
 
-    log_pass("Test 4: Boundary Checks");
+    ASTRA_LOG_DEBUG("Test 4: Boundary Checks");
 }
 
 // ---------------------------------------------------------
@@ -233,7 +225,7 @@ void test_concurrency()
         success_count++;
     };
 
-    log_info("Launching 10 threads, each acquiring/releasing 50 times...");
+    ASTRA_LOG_INFO("Launching 10 threads, each acquiring/releasing 50 times...");
 
     for (int i = 0; i < num_threads; ++i)
     {
@@ -247,7 +239,7 @@ void test_concurrency()
     }
 
     assert(success_count == num_threads);
-    log_pass("Test 5: Concurrency & Thread Safety");
+    ASTRA_LOG_DEBUG("Test 5: Concurrency & Thread Safety");
 }
 
 int main()
