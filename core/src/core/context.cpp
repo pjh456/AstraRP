@@ -1,4 +1,5 @@
 #include "core/context.hpp"
+#include "core/model.hpp"
 
 #include "llama.h"
 
@@ -9,7 +10,12 @@ namespace astra_rp
         Context::Context(
             MulPtr<Model> model,
             llama_context *ctx)
-            : m_model(model), m_ctx(ctx) {}
+            : m_model(model),
+              m_ctx(ctx
+                        ? ctx
+                        : llama_new_context_with_model(
+                              model->raw(),
+                              llama_context_default_params())) {}
 
         Context::~Context()
         {
