@@ -13,7 +13,7 @@ namespace astra_rp
             : m_model(model),
               m_ctx(ctx
                         ? ctx
-                        : llama_new_context_with_model(
+                        : llama_init_from_model(
                               model->raw(),
                               llama_context_default_params())) {}
 
