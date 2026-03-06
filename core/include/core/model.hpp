@@ -34,17 +34,6 @@ namespace astra_rp
         public:
             llama_model *raw() const noexcept { return m_model; }
             Str name() const noexcept { return m_name; }
-
-        public:
-            Vec<Token> tokenize(
-                const Str &text,
-                bool add_special = true,
-                bool parse_special = true) const;
-
-            Str detokenize(
-                const Vec<Token> &tokens,
-                bool remove_special = false,
-                bool unparse_special = true) const;
         };
     }
 }
