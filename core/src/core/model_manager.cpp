@@ -24,7 +24,7 @@ namespace astra_rp
 
             auto &name = params.m_name;
             if (m_table.count(name))
-                return nullptr;
+                return m_table[name];
 
             auto data = llama_model_load_from_file(
                 path.c_str(), params.m_params);
