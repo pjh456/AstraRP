@@ -76,8 +76,8 @@ namespace astra_rp
         {
             m_batch.n_tokens = 0;
 
-            if (m_batch.logits)
-                memset(m_batch.logits, 0, sizeof(int8_t) * m_max_tokens);
+            // if (m_batch.logits)
+            // memset(m_batch.logits, 0, sizeof(int8_t) * m_max_tokens);
 
             // TODO: clear embedding.
             // if (m_batch.embd)
