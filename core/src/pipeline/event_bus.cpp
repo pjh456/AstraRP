@@ -28,22 +28,34 @@ namespace astra_rp
 
         void EventBus::publish_token(const Str &id, const Str &text)
         {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            for (auto &cb : m_token_subs)
+            Vec<TokenCallback> callbacks;
+            {
+                std::lock_guard<std::mutex> lock(m_mtx);
+                callbacks = m_token_subs;
+            }
+            for (auto &cb : callbacks)
                 cb(id, text);
         }
 
         void EventBus::publish_state(const Str &id, NodeState state)
         {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            for (auto &cb : m_state_subs)
+            Vec<StateCallback> callbacks;
+            {
+                std::lock_guard<std::mutex> lock(m_mtx);
+                callbacks = m_state_subs;
+            }
+            for (auto &cb : callbacks)
                 cb(id, state);
         }
 
         void EventBus::publish_error(const Str &id, const Str &msg)
         {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            for (auto &cb : m_error_subs)
+            Vec<ErrorCallback> callbacks;
+            {
+                std::lock_guard<std::mutex> lock(m_mtx);
+                callbacks = m_error_subs;
+            }
+            for (auto &cb : callbacks)
                 cb(id, msg);
         }
     }
