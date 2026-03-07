@@ -33,7 +33,8 @@ namespace astra_rp
             LoRAManager &operator=(LoRAManager &&) noexcept = default;
 
         public:
-            MulPtr<LoRA> load(
+            ResultV<MulPtr<LoRA>>
+            load(
                 MulPtr<Model> model,
                 const Str &path,
                 const Str &name);
