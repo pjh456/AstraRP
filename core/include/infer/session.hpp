@@ -4,6 +4,7 @@
 #include "utils/types.hpp"
 #include "core/model.hpp"
 #include "core/context_params.hpp"
+#include "core/lora.hpp"
 #include "core/context.hpp"
 #include "core/sampler.hpp"
 #include "core/batch_manager.hpp"
@@ -17,6 +18,10 @@ namespace astra_rp
         private:
             MulPtr<astra_rp::core::Model> m_model;
             MulPtr<astra_rp::core::Context> m_ctx;
+
+            MulPtr<astra_rp::core::LoRA> m_lora = nullptr;
+            bool m_lora_enabled = false;
+
             astra_rp::core::Sampler m_sampler;
 
             int32_t m_seq_id;
@@ -36,6 +41,13 @@ namespace astra_rp
 
         public:
             void clear();
+
+            void enable_lora(
+                MulPtr<astra_rp::core::LoRA> lora,
+                float scale = 1.0f);
+            void enable_lora(float scale = 1.0f);
+
+            void disable_lora();
 
         public:
             Vec<uint8_t> export_state() const;

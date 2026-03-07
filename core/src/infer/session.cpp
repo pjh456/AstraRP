@@ -39,6 +39,36 @@ namespace astra_rp
             m_ctx->clear(true);
         }
 
+        void Session::enable_lora(
+            MulPtr<astra_rp::core::LoRA> lora,
+            float scale)
+        {
+            if (!lora)
+                return;
+            m_lora = lora;
+            enable_lora(scale);
+        }
+
+        void Session::enable_lora(float scale)
+        {
+            if (!m_lora)
+                return;
+
+            if (m_lora_enabled)
+                llama_rm_adapter_lora(m_ctx->raw(), m_lora->raw());
+
+            llama_set_adapter_lora(m_ctx->raw(), m_lora->raw(), scale);
+
+            m_lora_enabled = true;
+        }
+
+        void Session::disable_lora()
+        {
+            if (m_lora_enabled && m_lora)
+                llama_rm_adapter_lora(m_ctx->raw(), m_lora->raw());
+            m_lora_enabled = false;
+        }
+
         Vec<uint8_t> Session::export_state() const
         {
             return m_ctx->get_state(m_seq_id);
