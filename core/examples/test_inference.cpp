@@ -26,7 +26,14 @@ void test_streaming_inference(MulPtr<Model> model)
     ASTRA_LOG_INFO("--- Test 1: Streaming Inference ---");
 
     // 1. 初始化参数
-    auto ctx_params = ContextParamsBuilder().context_size(2048).build();
+    auto ctx_params =
+        ContextParamsBuilder()
+            .context_size(2048)
+            .batch_size(2048)
+            .threads(4)
+            .threads_batch(4)
+            .flash_attention(true)
+            .build();
     auto sampler = SamplerBuilder().greedy().build(); // 使用贪婪搜索，保证结果确定性
 
     // 2. 建立会话
@@ -67,7 +74,14 @@ void test_session_clear_and_generate(MulPtr<Model> model)
 {
     ASTRA_LOG_INFO("--- Test 2: Session Clear & Full Generate ---");
 
-    auto ctx_params = ContextParamsBuilder().context_size(2048).build();
+    auto ctx_params =
+        ContextParamsBuilder()
+            .context_size(2048)
+            .batch_size(2048)
+            .threads(4)
+            .threads_batch(4)
+            .flash_attention(true)
+            .build();
     auto sampler =
         SamplerBuilder()
             .top_k(40)

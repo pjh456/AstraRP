@@ -28,6 +28,7 @@ else()
     # -flto: 开启链接时优化，减小体积并提升跨文件调用性能
     # add_compile_options(-O3 -march=native -mtune=native -flto=auto)
     # add_link_options(-flto)
+    add_compile_options(-O2 -march=native -mtune=native)
 endif()
 
 # 3. 引入 llama.cpp 目录并开启内部优化开关
@@ -37,7 +38,7 @@ set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Disable llama.cpp examples" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Disable llama.cpp server" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Disable llama.cpp tests" FORCE)
 set(GGML_NATIVE ON CACHE BOOL "Enable native optimization" FORCE)
-set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
+set(LLAMA_BUILD_COMMON OFF CACHE BOOL "Build common library" FORCE)
 set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama.cpp)
 add_subdirectory(${LLAMA_DIR})
 
