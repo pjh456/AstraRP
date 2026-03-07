@@ -63,6 +63,12 @@ namespace astra_rp
                 return *this;
             }
 
+            ContextParamsBuilder &max_seqs(uint32_t count)
+            {
+                m_params.m_params.n_seq_max = count;
+                return *this;
+            }
+
             ContextParamsBuilder &threads(uint32_t count)
             {
                 m_params.m_params.n_threads = count;
