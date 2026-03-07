@@ -95,29 +95,36 @@ namespace astra_rp
         {
             using namespace astra_rp::core;
 
+            m_history_tokens.reserve(m_history_tokens.size() + tokens.size());
+
+            uint32_t max_batch_size = llama_n_batch(m_ctx->raw());
+
             auto batch = BatchManager::instance().acquire(tokens.size(), 1);
 
-            for (size_t i = 0; i < tokens.size(); ++i)
+            for (size_t i = 0; i < tokens.size(); i += max_batch_size)
             {
-                // last token needs to calculate logits for sampling.
-                bool require_logits = (i == tokens.size() - 1);
+                size_t chunk_size =
+                    std::min(
+                        (size_t)max_batch_size,
+                        tokens.size() - i);
 
-                batch->add(tokens[i], m_n_past, {m_seq_id}, require_logits);
+                for (size_t j = 0; j < chunk_size; ++j)
+                {
+                    size_t token_idx = i + j;
 
-                m_n_past++;
-                m_history_tokens.push_back(tokens[i]);
+                    // last token needs to calculate logits for sampling.
+                    bool require_logits = (token_idx == tokens.size() - 1);
+                    batch->add(tokens[token_idx], m_n_past, {m_seq_id}, require_logits);
+
+                    m_n_past++;
+                    m_history_tokens.push_back(tokens[token_idx]);
+                }
+
+                if (Engine::instance().decode(m_ctx, batch) != 0)
+                    return false;
             }
 
-            auto res = Engine::instance().decode(m_ctx, batch);
-
-            if (res != 0)
-            {
-                throw std::runtime_error(
-                    "Engine decode failed in feed_tokens! Code: " +
-                    std::to_string(res));
-            }
-
-            return res == 0;
+            return true;
         }
 
         Token Session::generate_next()
