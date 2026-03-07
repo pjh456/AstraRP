@@ -24,6 +24,8 @@ namespace astra_rp
 
             astra_rp::core::Sampler m_sampler;
 
+            MulPtr<astra_rp::core::Batch> m_single_batch;
+
             int32_t m_seq_id;
             int32_t m_n_past;
             bool m_is_finished;

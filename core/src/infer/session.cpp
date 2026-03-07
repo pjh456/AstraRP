@@ -23,6 +23,8 @@ namespace astra_rp
                         instance()
                             .acquire(model, ctx_params)),
               m_sampler(std::move(sampler)),
+              m_single_batch(
+                  astra_rp::core::BatchManager::instance().acquire(1, 1)),
               m_seq_id(seq_id),
               m_n_past(0),
               m_is_finished(false),
@@ -135,10 +137,10 @@ namespace astra_rp
                 return new_token;
             }
 
-            auto batch = BatchManager::instance().acquire(1, 1);
-            batch->add(new_token, m_n_past, {m_seq_id}, true);
+            m_single_batch->clear();
+            m_single_batch->add(new_token, m_n_past, {m_seq_id}, true);
 
-            auto res = Engine::instance().decode(m_ctx, batch);
+            auto res = Engine::instance().decode(m_ctx, m_single_batch);
 
             if (res != 0)
             {
