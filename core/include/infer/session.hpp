@@ -40,6 +40,14 @@ namespace astra_rp
             ~Session();
 
         public:
+            MulPtr<astra_rp::core::Model> model() const noexcept { return m_model; }
+            MulPtr<astra_rp::core::Context> context() const noexcept { return m_ctx; }
+            MulPtr<astra_rp::core::LoRA> lora() const noexcept { return m_lora; }
+
+            astra_rp::core::Sampler &sampler() noexcept { return m_sampler; }
+            const astra_rp::core::Sampler &sampler() const noexcept { return m_sampler; }
+
+        public:
             void clear();
 
             void enable_lora(
