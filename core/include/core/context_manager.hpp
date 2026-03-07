@@ -38,7 +38,10 @@ namespace astra_rp
             ContextManager &operator=(ContextManager &&) noexcept = default;
 
         public:
-            MulPtr<Context> acquire(MulPtr<Model> model, ContextParams params);
+            ResultV<MulPtr<Context>>
+            acquire(
+                MulPtr<Model> model,
+                ContextParams params);
 
         private:
             void release(const Str &name, Context *ctx);

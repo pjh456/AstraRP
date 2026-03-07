@@ -13,8 +13,10 @@ namespace astra_rp
         ContextManager::ContextManager()
             : m_init(InitManager::instance()) {}
 
-        MulPtr<Context> ContextManager::acquire(
-            MulPtr<Model> model, ContextParams params)
+        ResultV<MulPtr<Context>>
+        ContextManager::acquire(
+            MulPtr<Model> model,
+            ContextParams params)
         {
             std::lock_guard<std::mutex> lock(m_mtx);
 
@@ -36,15 +38,26 @@ namespace astra_rp
 
                 ctx_ptr->clear(true);
 
-                return MulPtr<Context>(
-                    ctx_ptr.release(), deleter);
+                return ResultV<MulPtr<Context>>::Ok(
+                    MulPtr<Context>(
+                        ctx_ptr.release(), deleter));
             }
 
             auto raw_ctx = llama_init_from_model(model->raw(), params.raw());
+            if (!raw_ctx)
+                return ResultV<MulPtr<Context>>::Err(
+                    utils::ErrorBuilder()
+                        .core()
+                        .context_init_failed()
+                        .message("Failed to allocate KV cache / init context (possibly out of memory)")
+                        .context_id(model->name())
+                        .build());
+
             auto *new_ctx = new Context(model, raw_ctx);
 
-            return MulPtr<Context>(
-                new_ctx, deleter);
+            return ResultV<MulPtr<Context>>::Ok(
+                MulPtr<Context>(
+                    new_ctx, deleter));
         }
 
         void ContextManager::release(const Str &name, Context *ctx)
