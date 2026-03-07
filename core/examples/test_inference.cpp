@@ -56,7 +56,7 @@ void test_streaming_inference(MulPtr<Model> model)
         if (session.is_finished())
             break;
 
-        Str piece = Tokenizer::detokenize(model, {t}, false, false);
+        Str piece = Tokenizer::detokenize(model, {t}, false, false).unwrap();
         std::cout << piece << std::flush;
 
         generated_count++;
@@ -145,7 +145,7 @@ int main()
                       .build();
 
     auto &model_manager = ModelManager::instance();
-    auto model = model_manager.load(path, params);
+    auto model = model_manager.load(path, params).unwrap();
 
     if (!model)
     {

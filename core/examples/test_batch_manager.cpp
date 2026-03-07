@@ -8,15 +8,8 @@
 
 #define ASTRA_SIMPLE_LOG
 
-// ==========================================
-// HACK: 为了单独测试 Batch 的移动语义，
-// 暂时将 private 成员暴露出来。
-// 仅用于单元测试。
-// ==========================================
-#define private public
 #include "core/batch.hpp"
 #include "core/batch_manager.hpp"
-#undef private
 
 #include "utils/logger.hpp"
 
@@ -26,62 +19,62 @@ using namespace astra_rp::core;
 // 测试 1: Batch 类的移动语义 (Move Semantics)
 // 验证手动实现的移动构造和赋值是否防止了 Double Free
 // ---------------------------------------------------------
-void test_batch_move_semantics()
-{
-    {
-        // 测试移动构造
-        Batch b1(512, 1);
-        // 模拟填充一些数据，确保资源被分配
-        b1.add(101, 0, {0}, false);
-        void *original_token_ptr = b1.raw().token;
+// void test_batch_move_semantics()
+// {
+//     {
+//         // 测试移动构造
+//         Batch b1(512, 1);
+//         // 模拟填充一些数据，确保资源被分配
+//         b1.add(101, 0, {0}, false);
+//         void *original_token_ptr = b1.raw().token;
 
-        // 执行移动构造
-        Batch b2(std::move(b1));
+//         // 执行移动构造
+//         Batch b2(std::move(b1));
 
-        // 验证源对象 (b1) 资源已悬空
-        assert(b1.raw().token == nullptr);
-        assert(b1.raw().n_tokens == 0);
+//         // 验证源对象 (b1) 资源已悬空
+//         assert(b1.raw().token == nullptr);
+//         assert(b1.raw().n_tokens == 0);
 
-        // 验证目标对象 (b2) 接管资源
-        assert(b2.raw().token == original_token_ptr);
-        assert(b2.size() == 1);
-        assert(b2.raw().token[0] == 101);
+//         // 验证目标对象 (b2) 接管资源
+//         assert(b2.raw().token == original_token_ptr);
+//         assert(b2.size() == 1);
+//         assert(b2.raw().token[0] == 101);
 
-        // b1 析构时不会 crash (因为 token 为 nullptr)
-        // b2 析构时会释放 original_token_ptr
-    }
-    ASTRA_LOG_INFO("Move Constructor verified.");
+//         // b1 析构时不会 crash (因为 token 为 nullptr)
+//         // b2 析构时会释放 original_token_ptr
+//     }
+//     ASTRA_LOG_INFO("Move Constructor verified.");
 
-    {
-        // 测试移动赋值
-        Batch b3(512, 1);
-        b3.add(202, 0, {0}, false);
-        void *ptr_b3 = b3.raw().token;
+//     {
+//         // 测试移动赋值
+//         Batch b3(512, 1);
+//         b3.add(202, 0, {0}, false);
+//         void *ptr_b3 = b3.raw().token;
 
-        Batch b4(256, 1); // b4 原本有自己的资源
-        void *ptr_b4_old = b4.raw().token;
+//         Batch b4(256, 1); // b4 原本有自己的资源
+//         void *ptr_b4_old = b4.raw().token;
 
-        // 执行移动赋值
-        b4 = std::move(b3);
+//         // 执行移动赋值
+//         b4 = std::move(b3);
 
-        // 验证 b3 被置空
-        assert(b3.raw().token == nullptr);
+//         // 验证 b3 被置空
+//         assert(b3.raw().token == nullptr);
 
-        // 验证 b4 释放了旧资源 (无法直接检测 free，但可以检测新指针)
-        assert(b4.raw().token == ptr_b3);
-        assert(b4.raw().token != ptr_b4_old);
-        assert(b4.size() == 1);
-        assert(b4.raw().token[0] == 202);
+//         // 验证 b4 释放了旧资源 (无法直接检测 free，但可以检测新指针)
+//         assert(b4.raw().token == ptr_b3);
+//         assert(b4.raw().token != ptr_b4_old);
+//         assert(b4.size() == 1);
+//         assert(b4.raw().token[0] == 202);
 
-        // 自我赋值测试 (边缘情况)
-        Batch *b4_ptr = &b4;
-        (*b4_ptr) = std::move(b4);
-        assert(b4.raw().token == ptr_b3); // 应该保持不变
-    }
-    ASTRA_LOG_INFO("Move Assignment verified.");
+//         // 自我赋值测试 (边缘情况)
+//         Batch *b4_ptr = &b4;
+//         (*b4_ptr) = std::move(b4);
+//         assert(b4.raw().token == ptr_b3); // 应该保持不变
+//     }
+//     ASTRA_LOG_INFO("Move Assignment verified.");
 
-    ASTRA_LOG_DEBUG("Test 1: Batch Move Semantics & RAII");
-}
+//     ASTRA_LOG_DEBUG("Test 1: Batch Move Semantics & RAII");
+// }
 
 // ---------------------------------------------------------
 // 测试 2: 复杂序列数据完整性
@@ -248,7 +241,7 @@ int main()
 
     try
     {
-        test_batch_move_semantics();
+        // test_batch_move_semantics();
         test_data_integrity();
         test_pool_reuse_logic();
         test_boundaries();

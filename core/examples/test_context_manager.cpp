@@ -29,7 +29,7 @@ void test_context_lifecycle(MulPtr<Model> model)
                       .batch_size(128)
                       .build();
 
-    auto ctx = manager.acquire(model, params);
+    auto ctx = manager.acquire(model, params).unwrap();
 
     assert(ctx != nullptr);
     assert(ctx->raw() != nullptr);
@@ -54,13 +54,13 @@ void test_pool_reuse_logic(MulPtr<Model> model)
 
     // 作用域 1: 申请并归还
     {
-        auto ctx1 = manager.acquire(model, params);
+        auto ctx1 = manager.acquire(model, params).unwrap();
         raw_ptr1 = ctx1->raw();
     }
 
     // 作用域 2: 再次申请，规格相同，必须复用
     {
-        auto ctx2 = manager.acquire(model, params);
+        auto ctx2 = manager.acquire(model, params).unwrap();
         assert(ctx2->raw() == raw_ptr1);
         ASTRA_LOG_INFO("Context reused successfully.");
     }
@@ -68,7 +68,7 @@ void test_pool_reuse_logic(MulPtr<Model> model)
     // 作用域 3: 申请更高规格的 Context (1024)，无法复用池子中 512 的
     {
         auto larger_params = ContextParamsBuilder().context_size(1024).build();
-        auto ctx3 = manager.acquire(model, larger_params);
+        auto ctx3 = manager.acquire(model, larger_params).unwrap();
 
         // 由于容量要求变大，应该分配了一个全新的 context (前提是刚才 512 的没有被对齐到>=1024)
         if (ctx3->capacity() > 512)
@@ -89,7 +89,7 @@ void test_state_management(MulPtr<Model> model)
     auto &manager = ContextManager::instance();
     auto params = ContextParamsBuilder().context_size(128).build();
 
-    auto ctx = manager.acquire(model, params);
+    auto ctx = manager.acquire(model, params).unwrap();
 
     // 1. 获取状态大小
     size_t state_size = ctx->state_size(0);
@@ -127,7 +127,7 @@ void test_concurrency(MulPtr<Model> model)
             uint32_t req_size = (i % 2 == 0) ? 128 : 256;
             auto params = ContextParamsBuilder().context_size(req_size).build();
 
-            auto ctx = manager.acquire(model, params);
+            auto ctx = manager.acquire(model, params).unwrap();
             assert(ctx->capacity() >= req_size);
 
             // 简单验证清理函数不会崩溃
@@ -179,7 +179,7 @@ int main()
     auto &model_manager = ModelManager::instance();
     auto model_params = ModelParamsBuilder(name).use_mmap(true).build();
 
-    auto model = model_manager.load(path, model_params);
+    auto model = model_manager.load(path, model_params).unwrap();
     if (!model || !model->raw())
     {
         std::cerr << "[FATAL] Failed to load model." << std::endl;

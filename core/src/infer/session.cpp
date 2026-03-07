@@ -21,7 +21,8 @@ namespace astra_rp
             : m_model(model),
               m_ctx(astra_rp::core::ContextManager::
                         instance()
-                            .acquire(model, ctx_params)),
+                            .acquire(model, ctx_params)
+                            .unwrap()),
               m_sampler(std::move(sampler)),
               m_single_batch(
                   astra_rp::core::BatchManager::instance().acquire(1, 1)),
@@ -86,7 +87,7 @@ namespace astra_rp
         {
             using namespace astra_rp::core;
 
-            auto tokens = Tokenizer::tokenize(m_model, prompt);
+            auto tokens = Tokenizer::tokenize(m_model, prompt).unwrap();
 
             return feed_tokens(tokens);
         }
@@ -183,7 +184,7 @@ namespace astra_rp
                 count++;
             }
 
-            return Tokenizer::detokenize(m_model, newly_generated);
+            return Tokenizer::detokenize(m_model, newly_generated).unwrap();
         }
     }
 }
