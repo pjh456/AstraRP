@@ -1,4 +1,3 @@
-#include "common.h"
 #include "llama.h"
 #include "core/model.hpp"
 

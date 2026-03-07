@@ -75,11 +75,9 @@ add_library(astrarp_lib STATIC ${ASTRARP_SOURCES} ${ASTRARP_HEADERS})
 
 target_include_directories(astrarp_lib PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/common"
-)
+    "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include")
 
-target_link_libraries(astrarp_lib PUBLIC llama common)
+target_link_libraries(astrarp_lib PUBLIC llama)
 
 add_executable(astra src/main.cpp)
 target_link_libraries(astra PRIVATE astrarp_lib)
