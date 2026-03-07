@@ -8,7 +8,8 @@ namespace astra_rp
 {
     namespace core
     {
-        Vec<Token> Tokenizer::tokenize(
+        ResultV<Vec<Token>>
+        Tokenizer::tokenize(
             MulPtr<Model> model,
             const Str &text,
             bool add_special,
@@ -30,19 +31,26 @@ namespace astra_rp
                     result.data(), result.size(),
                     add_special, parse_special);
             if (status < 0)
-                throw std::runtime_error("Failed to tokenize the text.");
+                return ResultV<Vec<Token>>::Err(
+                    utils::ErrorBuilder()
+                        .core()
+                        .tokenize_failed()
+                        .message("llama_tokenize returned negative status (Buffer too small or invalid utf-8)")
+                        .context_id(model->name())
+                        .build());
 
-            return result;
+            return ResultV<Vec<Token>>::Ok(std::move(result));
         }
 
-        Str Tokenizer::detokenize(
+        ResultV<Str>
+        Tokenizer::detokenize(
             MulPtr<Model> model,
             const Vec<Token> &tokens,
             bool remove_special,
             bool unparse_special)
         {
             if (tokens.empty())
-                return "";
+                return ResultV<Str>::Ok("");
 
             auto vocab = llama_model_get_vocab(model->raw());
 
@@ -67,12 +75,18 @@ namespace astra_rp
                 unparse_special);
 
             if (written < 0)
-                throw std::runtime_error("detokenize failed!");
+                return ResultV<Str>::Err(
+                    utils::ErrorBuilder()
+                        .core()
+                        .detokenize_failed()
+                        .message("llama_detokenize failed mapping tokens to string")
+                        .context_id(model->name())
+                        .build());
 
             if (written != str_count)
                 result.resize(written);
 
-            return result;
+            return ResultV<Str>::Ok(std::move(result));
         }
     }
 }

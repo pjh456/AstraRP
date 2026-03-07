@@ -11,13 +11,13 @@ namespace astra_rp
         class Tokenizer
         {
         public:
-            static Vec<Token> tokenize(
+            static ResultV<Vec<Token>> tokenize(
                 MulPtr<Model> model,
                 const Str &text,
                 bool add_special = true,
                 bool parse_special = true);
 
-            static Str detokenize(
+            static ResultV<Str> detokenize(
                 MulPtr<Model> model,
                 const Vec<Token> &tokens,
                 bool remove_special = false,
