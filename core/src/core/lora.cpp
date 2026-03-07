@@ -17,7 +17,7 @@ namespace astra_rp
             if (m_adapter)
             {
                 // actually auto free by model.
-                llama_adapter_lora_free(m_adapter);
+                // llama_adapter_lora_free(m_adapter);
                 m_adapter = nullptr;
             }
         }
