@@ -10,6 +10,9 @@
 #include <queue>
 #include <memory>
 
+#include "utils/result.hpp"
+#include "utils/error.hpp"
+
 namespace astra_rp
 {
     using Str = std::string;
@@ -36,6 +39,9 @@ namespace astra_rp
     using MulPtr = std::shared_ptr<T>;
 
     using Token = int32_t;
+
+    template <typename T>
+    using ResultV = utils::Result<T, utils::Error>;
 }
 
 #endif // INCLUDE_ASTRA_RP_TYPES_HPP
