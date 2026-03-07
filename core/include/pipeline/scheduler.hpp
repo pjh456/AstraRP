@@ -3,6 +3,7 @@
 
 #include <mutex>
 #include <condition_variable>
+#include <thread>
 
 #include "utils/types.hpp"
 
@@ -18,16 +19,30 @@ namespace astra_rp
             MulPtr<Graph> m_graph;
 
             HashMap<Str, int> m_current_in_degrees;
+            Queue<Str> m_ready_queue;
 
             std::mutex m_mtx;
             std::condition_variable m_cv;
+
             int m_active_tasks = 0;
+            bool m_stop = false;
+
+            Vec<std::thread> m_workers;
+            int m_max_concurrency;
 
         public:
-            Scheduler(MulPtr<Graph> graph)
-                : m_graph(graph) {}
+            Scheduler(
+                MulPtr<Graph> graph,
+                int max_concurrency = 1)
+                : m_graph(graph),
+                  m_max_concurrency(max_concurrency) {}
+
+            ~Scheduler();
 
             void run();
+
+        private:
+            void worker_thread();
         };
     }
 }
