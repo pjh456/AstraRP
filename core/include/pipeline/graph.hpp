@@ -25,8 +25,7 @@ namespace astra_rp
 
             void add_edge(const Str &from_id, const Str &to_id);
 
-            // TODO: 拓扑环检测
-            bool validate() const { return false; }
+            bool validate() const;
         };
     }
 }
