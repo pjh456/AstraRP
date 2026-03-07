@@ -64,6 +64,10 @@ namespace astra_rp
             return llama_sampler_sample(m_sampler, ctx.raw(), idx);
         }
 
+        SamplerBuilder::SamplerBuilder(
+            SamplerParams params)
+            : m_sampler(llama_sampler_chain_init(params.raw())) {}
+
         SamplerBuilder &SamplerBuilder::greedy()
         {
             llama_sampler_chain_add(
