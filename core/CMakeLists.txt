@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 project(AstraRP_core VERSION 0.1.0)
 
 # 1. 设置 C++ 标准 (llama.cpp 要求至少 C++11，建议使用 17 或更高)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 2. CPU 指令集优化：开启高度优化并启用原生指令集 (AVX2/AVX512等)
