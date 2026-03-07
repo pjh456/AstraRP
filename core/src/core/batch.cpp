@@ -1,5 +1,6 @@
 #include "core/batch.hpp"
 
+#include <string.h>
 #include <stdexcept>
 
 namespace astra_rp
@@ -69,6 +70,18 @@ namespace astra_rp
                 m_batch.seq_id[i][j] = seq_ids[j];
 
             m_batch.n_tokens++;
+        }
+
+        void Batch::clear()
+        {
+            m_batch.n_tokens = 0;
+
+            if (m_batch.logits)
+                memset(m_batch.logits, 0, sizeof(int8_t) * m_max_tokens);
+
+            // TODO: clear embedding.
+            // if (m_batch.embd)
+            //     memset(m_batch.embd, 0, sizeof(float) * m_max_tokens * dimensions);
         }
     }
 }

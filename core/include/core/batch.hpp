@@ -34,7 +34,8 @@ namespace astra_rp
 
         public:
             void add(Token id, int32_t pos, const Vec<int32_t> &seq_ids, bool logits);
-            void clear() { m_batch.n_tokens = 0; }
+
+            void clear();
 
         public:
             llama_batch raw() const noexcept { return m_batch; }
