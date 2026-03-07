@@ -36,7 +36,7 @@ namespace astra_rp
             ModelManager &operator=(ModelManager &&) noexcept = default;
 
         public:
-            MulPtr<Model> load(const Str &path, ModelParams params);
+            ResultV<MulPtr<Model>> load(const Str &path, ModelParams params);
             void unload(const Str &name);
         };
     }
