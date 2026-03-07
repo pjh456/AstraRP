@@ -7,6 +7,7 @@
 #include <list>
 #include <map>
 #include <unordered_map>
+#include <queue>
 #include <memory>
 
 namespace astra_rp
@@ -18,6 +19,9 @@ namespace astra_rp
 
     template <typename T>
     using List = std::list<T>;
+
+    template <typename T>
+    using Queue = std::queue<T>;
 
     template <typename K, typename V>
     using Map = std::map<K, V>;
