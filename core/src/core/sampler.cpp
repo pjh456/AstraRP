@@ -73,6 +73,16 @@ namespace astra_rp
             llama_sampler_chain_add(
                 m_sampler.m_sampler,
                 llama_sampler_init_greedy());
+            m_has_selector = true;
+            return *this;
+        }
+
+        SamplerBuilder &SamplerBuilder::seed(uint32_t seed)
+        {
+            llama_sampler_chain_add(
+                m_sampler.m_sampler,
+                llama_sampler_init_dist(seed));
+            m_has_selector = true;
             return *this;
         }
 
@@ -113,14 +123,6 @@ namespace astra_rp
             llama_sampler_chain_add(
                 m_sampler.m_sampler,
                 llama_sampler_init_temp(t));
-            return *this;
-        }
-
-        SamplerBuilder &SamplerBuilder::seed(uint32_t seed)
-        {
-            llama_sampler_chain_add(
-                m_sampler.m_sampler,
-                llama_sampler_init_dist(seed));
             return *this;
         }
 
