@@ -68,7 +68,8 @@ void test_linear_pipeline()
     graph->add_edge("B", "C");
 
     Scheduler scheduler(graph);
-    scheduler.run();
+    auto res = scheduler.run();
+    assert(res.is_ok());
 
     // 验证状态
     assert(node_a->state() == NodeState::FINISHED);
@@ -116,8 +117,10 @@ void test_diamond_pipeline()
     Scheduler scheduler(graph);
 
     auto t_begin = std::chrono::steady_clock::now();
-    scheduler.run();
+    auto res = scheduler.run();
     auto t_end = std::chrono::steady_clock::now();
+
+    assert(res.is_ok());
 
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_begin).count();
 

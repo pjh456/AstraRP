@@ -39,7 +39,7 @@ namespace astra_rp
 
             ~Scheduler();
 
-            void run();
+            ResultV<void> run();
 
         private:
             void worker_thread();

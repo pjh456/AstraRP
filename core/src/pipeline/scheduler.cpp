@@ -23,10 +23,13 @@ namespace astra_rp
             }
         }
 
-        void Scheduler::run()
+        ResultV<void>
+        Scheduler::run()
         {
-            if (m_graph->validate().is_err())
-                throw std::runtime_error("Graph has cycles!");
+            auto validation_res = m_graph->validate();
+            if (validation_res.is_err())
+                return ResultV<void>::Err(
+                    validation_res.unwrap_err());
 
             m_current_in_degrees = m_graph->in_degrees();
             m_stop = false;
@@ -55,6 +58,8 @@ namespace astra_rp
             }
 
             m_workers.clear();
+
+            return ResultV<void>::Ok();
         }
 
         void Scheduler::worker_thread()
