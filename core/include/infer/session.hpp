@@ -32,11 +32,18 @@ namespace astra_rp
 
             Vec<Token> m_history_tokens;
 
-        public:
+        private:
             Session(
                 MulPtr<astra_rp::core::Model> model,
+                astra_rp::core::Sampler &&sampler,
+                int32_t seq_id);
+
+        public:
+            static ResultV<MulPtr<Session>>
+            create(
+                MulPtr<astra_rp::core::Model> model,
                 astra_rp::core::ContextParams ctx_params,
-                astra_rp::core::Sampler &&sampler_params,
+                astra_rp::core::Sampler &&sampler,
                 int32_t seq_id = 0);
 
             ~Session();

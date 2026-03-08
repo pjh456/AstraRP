@@ -39,12 +39,14 @@ void test_streaming_inference(MulPtr<Model> model)
     auto sampler = sampler_res.unwrap();
 
     // 2. 建立会话
-    Session session(model, ctx_params, std::move(sampler), 0);
+    auto session_res = Session::create(model, ctx_params, std::move(sampler), 0);
+    assert(session_res.is_ok());
+    auto session = session_res.unwrap();
 
     // 3. 喂入 Prompt
     Str prompt = "User: Hello, count from 1 to 5.\nAssistant: ";
     ASTRA_LOG_INFO("Feeding Prompt: " + prompt);
-    auto feed_res = session.feed_prompt(prompt);
+    auto feed_res = session->feed_prompt(prompt);
     assert(feed_res.is_ok());
 
     // 4. 流式生成
@@ -52,12 +54,12 @@ void test_streaming_inference(MulPtr<Model> model)
     int generated_count = 0;
 
     // 终端可能会缓冲不完整的 UTF-8 字符（如中文），C++标准输出刷新可解决大部分问题
-    while (!session.is_finished() && generated_count < 50)
+    while (!session->is_finished() && generated_count < 50)
     {
-        auto token_res = session.generate_next();
+        auto token_res = session->generate_next();
         assert(token_res.is_ok());
         auto t = token_res.unwrap();
-        if (session.is_finished())
+        if (session->is_finished())
             break;
 
         auto piece_res = Tokenizer::detokenize(model, {t}, false, false);
@@ -69,7 +71,7 @@ void test_streaming_inference(MulPtr<Model> model)
     }
     std::cout << std::endl;
 
-    assert(session.get_n_past() > 0);
+    assert(session->get_n_past() > 0);
     ASTRA_LOG_DEBUG("Streaming generation finished. Tokens: " + std::to_string(generated_count));
 }
 
@@ -98,30 +100,32 @@ void test_session_clear_and_generate(MulPtr<Model> model)
     assert(sampler_res.is_ok());
     auto sampler = sampler_res.unwrap();
 
-    Session session(model, ctx_params, std::move(sampler), 0);
+    auto session_res = Session::create(model, ctx_params, std::move(sampler), 0);
+    assert(session_res.is_ok());
+    auto session = session_res.unwrap();
 
     // [第 1 轮]
     Str prompt1 = "User: What is the capital of France?\nAssistant: ";
-    auto feed_res1 = session.feed_prompt(prompt1);
+    auto feed_res1 = session->feed_prompt(prompt1);
     assert(feed_res1.is_ok());
 
-    auto response1_res = session.generate(20); // 限制生成20个Token
+    auto response1_res = session->generate(20); // 限制生成20个Token
     assert(response1_res.is_ok());
     auto response1 = response1_res.unwrap();
     ASTRA_LOG_INFO("Round 1 Output: " + response1);
 
     // [清理会话] - 抹除历史记忆，避免 KV Cache OOM
-    session.clear();
-    assert(session.get_n_past() == 0);
-    assert(!session.is_finished());
+    session->clear();
+    assert(session->get_n_past() == 0);
+    assert(!session->is_finished());
     ASTRA_LOG_INFO("Session cleared.");
 
     //[第 2 轮]
     Str prompt2 = "User: What is the capital of Japan?\nAssistant: ";
-    auto feed_res2 = session.feed_prompt(prompt2);
+    auto feed_res2 = session->feed_prompt(prompt2);
     assert(feed_res2.is_ok());
 
-    auto response2_res = session.generate(20);
+    auto response2_res = session->generate(20);
     assert(response2_res.is_ok());
     auto response2 = response2_res.unwrap();
     ASTRA_LOG_INFO("Round 2 Output: " + response2);

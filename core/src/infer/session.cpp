@@ -16,29 +16,42 @@ namespace astra_rp
     {
         Session::Session(
             MulPtr<astra_rp::core::Model> model,
-            astra_rp::core::ContextParams ctx_params,
             astra_rp::core::Sampler &&sampler,
             int32_t seq_id)
             : m_model(model),
-              m_ctx(astra_rp::core::ContextManager::
-                        instance()
-                            .acquire(model, ctx_params)
-                            .unwrap()),
+              m_ctx(nullptr),
+              m_single_batch(nullptr),
               m_sampler(std::move(sampler)),
               m_seq_id(seq_id),
               m_n_past(0),
               m_is_finished(false),
-              m_history_tokens()
+              m_history_tokens() {}
+
+        ResultV<MulPtr<Session>>
+        Session::create(
+            MulPtr<astra_rp::core::Model> model,
+            astra_rp::core::ContextParams ctx_params,
+            astra_rp::core::Sampler &&sampler,
+            int32_t seq_id)
         {
-            auto batch_res = astra_rp::core::BatchManager::instance().acquire(1, 1);
-            if (!batch_res.is_ok())
-            {
-                ASTRA_LOG_ERROR(
-                    "Failed to acquire batch for Session initialization: " +
-                    batch_res.unwrap_err().message());
-                throw std::runtime_error("Failed to acquire batch for Session initialization");
-            }
-            m_single_batch = batch_res.unwrap();
+            using namespace astra_rp::core;
+
+            ASSIGN_OR_RETURN(
+                ctx,
+                ContextManager::instance()
+                    .acquire(model, ctx_params));
+            ASSIGN_OR_RETURN(
+                batch,
+                BatchManager::instance()
+                    .acquire(1, 1));
+
+            auto ptr = new Session(model, std::move(sampler), seq_id);
+            auto session = MulPtr<Session>(ptr);
+
+            session->m_ctx = ctx;
+            session->m_single_batch = batch;
+
+            return ResultV<MulPtr<Session>>::Ok(session);
         }
 
         Session::~Session() = default;
