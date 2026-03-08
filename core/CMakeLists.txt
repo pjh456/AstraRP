@@ -22,6 +22,8 @@ endif()
 if(MSVC)
     add_compile_options(/utf-8 /MP) # /MP 开启多核编译
 
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
     # Windows / MSVC 优化
     add_compile_options(
         $<$<CONFIG:Release>:/O2>
@@ -37,7 +39,10 @@ if(MSVC)
         $<$<CONFIG:RelWithDebInfo>:/LTCG>
     ) # 开启链接时代码生成
 else()
-    add_compile_options(-march=native -mtune=native)
+    add_link_options(
+        -static-libgcc
+        -static-libstdc++
+        -static)
 
     # Linux / macOS (GCC/Clang) 优化
     # -O3: 最高级优化
@@ -59,12 +64,16 @@ set(GGML_RPC OFF CACHE BOOL "Disable RPC support" FORCE)
 set(LLAMA_STANDALONE OFF CACHE BOOL "Tell llama.cpp it is being included" FORCE)
 
 set(GGML_NATIVE ON CACHE BOOL "Enable native optimization" FORCE)
-set(GGML_OPENMP ON CACHE BOOL "Enable OpenMP" FORCE)
+set(GGML_OPENMP OFF CACHE BOOL "Enable OpenMP" FORCE)
 
 set(LLAMA_HTTPLIB OFF CACHE BOOL "Disable llama.cpp httplib" FORCE)
 set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
 
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
+set(LLAMA_SHARED OFF CACHE BOOL "Disable llama shared lib" FORCE)
+
 set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama.cpp)
+set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(${LLAMA_DIR})
 
 # 注入环境变量
@@ -107,12 +116,11 @@ target_link_libraries(astrarp_lib PUBLIC llama)
 add_executable(astra src/main.cpp)
 target_link_libraries(astra PRIVATE astrarp_lib)
 
-add_custom_command(TARGET astra POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    $<TARGET_FILE:llama>
-    $<TARGET_FILE_DIR:astra>
-)
-
+# add_custom_command(TARGET astra POST_BUILD
+# COMMAND ${CMAKE_COMMAND} -E copy_if_different
+# $<TARGET_FILE:llama>
+# $<TARGET_FILE_DIR:astra>
+# )
 enable_testing()
 
 # 查找 examples 目录下所有的 cpp 文件
