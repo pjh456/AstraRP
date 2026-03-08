@@ -110,12 +110,7 @@ namespace astra_rp
 
             uint32_t max_batch_size = llama_n_batch(m_ctx->raw());
 
-            auto batch_res =
-                BatchManager::instance()
-                    .acquire(tokens.size(), 1);
-            if (batch_res.is_err())
-                return ResultV<void>::Err(batch_res.unwrap_err());
-            auto batch = batch_res.unwrap();
+            ASSIGN_OR_RETURN(batch, BatchManager::instance().acquire(tokens.size(), 1));
 
             for (size_t i = 0; i < tokens.size(); i += max_batch_size)
             {
@@ -130,28 +125,36 @@ namespace astra_rp
 
                     // last token needs to calculate logits for sampling.
                     bool require_logits = (token_idx == tokens.size() - 1);
-                    auto add_res = batch->add(tokens[token_idx], m_n_past, {m_seq_id}, require_logits);
-                    if (add_res.is_err())
-                    {
-                        ASTRA_LOG_ERROR("Failed to add token to batch: " + add_res.unwrap_err().message());
-                        return ResultV<void>::Err(add_res.unwrap_err());
-                    }
+
+                    TRY(batch->add(
+                                 tokens[token_idx],
+                                 m_n_past,
+                                 {m_seq_id},
+                                 require_logits)
+                            .map_err(
+                                [](auto err)
+                                {
+                                    ASTRA_LOG_ERROR("Failed to add token to batch: " + err.message());
+                                    return err;
+                                }));
 
                     m_n_past++;
                     m_history_tokens.push_back(tokens[token_idx]);
                 }
 
-                auto decode_res = Engine::instance().decode(m_ctx, batch);
-                if (decode_res.is_err())
-                {
-                    return ResultV<void>::Err(
-                        utils::ErrorBuilder()
-                            .infer()
-                            .engine_decode_failed()
-                            .message("Engine decode failed during feed_tokens")
-                            .context_id("SeqID_" + std::to_string(m_seq_id))
-                            .build());
-                }
+                TRY(Engine::instance()
+                        .decode(m_ctx, batch)
+                        .map_err(
+                            [&](auto err)
+                            {
+                                ASTRA_LOG_ERROR("Engine decode failed during feed_tokens: " + err.message());
+                                return utils::ErrorBuilder()
+                                    .infer()
+                                    .engine_decode_failed()
+                                    .message("Engine decode failed during feed_tokens")
+                                    .context_id("SeqID_" + std::to_string(m_seq_id))
+                                    .build();
+                            }));
             }
 
             return ResultV<void>::Ok();
@@ -176,24 +179,31 @@ namespace astra_rp
             }
 
             m_single_batch->clear();
+            TRY(m_single_batch
+                    ->add(
+                        new_token, m_n_past,
+                        {m_seq_id},
+                        true)
+                    .map_err(
+                        [](auto err)
+                        {
+                            ASTRA_LOG_ERROR("Failed to add token to single batch: " + err.message());
+                            return err;
+                        }));
 
-            auto add_res = m_single_batch->add(
-                new_token, m_n_past, {m_seq_id}, true);
-            if (add_res.is_err())
-            {
-                ASTRA_LOG_ERROR(
-                    "Failed to add token to single batch: " +
-                    add_res.unwrap_err().message());
-                return ResultV<Token>::Err(add_res.unwrap_err());
-            }
-
-            auto decode_res = Engine::instance().decode(m_ctx, m_single_batch);
-
-            if (decode_res.is_err())
-            {
-                ASTRA_LOG_ERROR("Engine decode failed during token generation: " + decode_res.unwrap_err().message());
-                return ResultV<Token>::Err(decode_res.unwrap_err());
-            }
+            TRY(Engine::instance()
+                    .decode(m_ctx, m_single_batch)
+                    .map_err(
+                        [&](auto err)
+                        {
+                            ASTRA_LOG_ERROR("Engine decode failed during token generation: " + err.message());
+                            return utils::ErrorBuilder()
+                                .infer()
+                                .engine_decode_failed()
+                                .message("Engine decode failed during token generation")
+                                .context_id("SeqID_" + std::to_string(m_seq_id))
+                                .build();
+                        }));
 
             m_n_past++;
             m_history_tokens.push_back(new_token);
@@ -214,13 +224,15 @@ namespace astra_rp
                 if (max_tokens > 0 && count >= max_tokens)
                     break;
 
-                auto token_res = generate_next();
-                if (token_res.is_err())
-                {
-                    ASTRA_LOG_ERROR("Failed to generate next token: " + token_res.unwrap_err().message());
-                    return ResultV<Str>::Err(token_res.unwrap_err());
-                }
-                auto token = token_res.unwrap();
+                ASSIGN_OR_RETURN(
+                    token,
+                    generate_next()
+                        .map_err(
+                            [](auto err)
+                            {
+                                ASTRA_LOG_ERROR("Failed to generate next token: " + err.message());
+                                return err;
+                            }));
 
                 if (m_is_finished)
                     break;
@@ -229,13 +241,17 @@ namespace astra_rp
                 count++;
             }
 
-            auto detokenize_res = Tokenizer::detokenize(m_model, newly_generated, false, false);
-            if (detokenize_res.is_err())
-            {
-                ASTRA_LOG_ERROR("Failed to detokenize generated tokens: " + detokenize_res.unwrap_err().message());
-                return ResultV<Str>::Err(detokenize_res.unwrap_err());
-            }
-            return ResultV<Str>::Ok(detokenize_res.unwrap());
+            return Tokenizer::detokenize(
+                       m_model,
+                       newly_generated,
+                       false,
+                       false)
+                .map_err(
+                    [](auto err)
+                    {
+                        ASTRA_LOG_ERROR("Failed to detokenize generated tokens: " + err.message());
+                        return err;
+                    });
         }
     }
 }
