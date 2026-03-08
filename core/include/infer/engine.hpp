@@ -27,7 +27,8 @@ namespace astra_rp
             Engine &operator=(Engine &&) noexcept = default;
 
         public:
-            int32_t decode(
+            ResultV<void>
+            decode(
                 MulPtr<astra_rp::core::Context> ctx,
                 MulPtr<astra_rp::core::Batch> batch);
         };

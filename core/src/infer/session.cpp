@@ -139,7 +139,7 @@ namespace astra_rp
                     m_history_tokens.push_back(tokens[token_idx]);
                 }
 
-                if (Engine::instance().decode(m_ctx, batch) != 0)
+                if (Engine::instance().decode(m_ctx, batch).is_err())
                     return false;
             }
 
@@ -174,11 +174,10 @@ namespace astra_rp
 
             auto res = Engine::instance().decode(m_ctx, m_single_batch);
 
-            if (res != 0)
+            if (res.is_err())
             {
-                throw std::runtime_error(
-                    "Engine decode failed in generate_next! Code: " +
-                    std::to_string(res));
+                ASTRA_LOG_ERROR("Engine decode failed during token generation: " + res.unwrap_err().message());
+                throw std::runtime_error("Engine decode failed during token generation");
             }
 
             m_n_past++;
