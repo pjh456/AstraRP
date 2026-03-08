@@ -50,6 +50,17 @@ namespace astra_rp
             };
         }
 
+        // 用于在宏中擦除 T 类型，触发 Result 的隐式转换并自动构建 Err 状态
+        template <typename E>
+        struct Failure
+        {
+            E error;
+        };
+
+        // 直接 Failure{err} 而不用写 Failure<E>{err}
+        template <typename E>
+        Failure(E) -> Failure<E>;
+
         /**
          * @brief 结果封装类 (Monad)
          *
@@ -107,6 +118,22 @@ namespace astra_rp
 
             explicit Result(Result &&) noexcept = default;
             Result &operator=(Result &&) noexcept = default;
+
+            template <typename G>
+                requires std::constructible_from<E, const G &>
+            Result(const Failure<G> &f) noexcept(
+                std::is_nothrow_constructible_v<E, const G &>)
+                : data(E(f.error))
+            {
+            }
+
+            template <typename G>
+                requires std::constructible_from<E, G &&>
+            Result(Failure<G> &&f) noexcept(
+                std::is_nothrow_constructible_v<E, G &&>)
+                : data(E(std::forward<G>(f.error)))
+            {
+            }
 
         public:
             bool is_ok() const noexcept { return std::holds_alternative<T>(data); }
@@ -374,6 +401,22 @@ namespace astra_rp
             explicit Result(Result &&) noexcept = default;
             Result &operator=(Result &&) noexcept = default;
 
+            template <typename G>
+                requires std::constructible_from<E, const G &>
+            Result(const Failure<G> &f) noexcept(
+                std::is_nothrow_constructible_v<E, const G &>)
+                : data(E(f.error))
+            {
+            }
+
+            template <typename G>
+                requires std::constructible_from<E, G &&>
+            Result(Failure<G> &&f) noexcept(
+                std::is_nothrow_constructible_v<E, G &&>)
+                : data(E(std::forward<G>(f.error)))
+            {
+            }
+
         public:
             bool is_ok() const noexcept { return std::holds_alternative<std::monostate>(data); }
             bool is_err() const noexcept { return std::holds_alternative<E>(data); }
@@ -554,4 +597,38 @@ namespace astra_rp
         }
     }
 }
+
+#define RESULT_CONCAT_INNER(a, b) a##b
+#define RESULT_CONCAT(a, b) RESULT_CONCAT_INNER(a, b)
+#define RESULT_UNIQUE_VAR(prefix) RESULT_CONCAT(prefix, __LINE__)
+
+/**
+ * @brief 仿 Rust `?` 运算符 (针对带返回值的 Result<T, E>)
+ *
+ * 作用：执行 expr，如果返回 Ok(v)，则声明 auto var_name = v；
+ *      如果返回 Err(e)，则当前函数立即 return 错误。
+ */
+#define ASSIGN_OR_RETURN(var_name, expr)                                                   \
+    auto RESULT_UNIQUE_VAR(_res_) = (expr);                                                \
+    if (RESULT_UNIQUE_VAR(_res_).is_err())                                                 \
+    {                                                                                      \
+        return astra_rp::utils::Failure{std::move(RESULT_UNIQUE_VAR(_res_).unwrap_err())}; \
+    }                                                                                      \
+    auto var_name = std::move(RESULT_UNIQUE_VAR(_res_).unwrap())
+
+/**
+ * @brief 仿 Rust `?` 运算符 (针对无返回值的 Result<void, E>)
+ *
+ * 作用：执行 expr，如果是 Ok 则继续往下走；如果是 Err，则当前函数立即 return 错误。
+ */
+#define TRY(expr)                                                                              \
+    do                                                                                         \
+    {                                                                                          \
+        auto RESULT_UNIQUE_VAR(_res_) = (expr);                                                \
+        if (RESULT_UNIQUE_VAR(_res_).is_err())                                                 \
+        {                                                                                      \
+            return astra_rp::utils::Failure{std::move(RESULT_UNIQUE_VAR(_res_).unwrap_err())}; \
+        }                                                                                      \
+    } while (0)
+
 #endif // INCLUDE_ASTRA_RP_RESULT_HPP
