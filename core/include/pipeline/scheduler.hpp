@@ -42,7 +42,7 @@ namespace astra_rp
             ResultV<void> run();
 
         private:
-            void worker_thread();
+            ResultV<void> worker_thread();
         };
     }
 }

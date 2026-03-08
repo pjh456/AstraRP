@@ -64,7 +64,8 @@ namespace astra_rp
             return ResultV<void>::Ok();
         }
 
-        void Scheduler::worker_thread()
+        ResultV<void>
+        Scheduler::worker_thread()
         {
             while (true)
             {
@@ -95,6 +96,7 @@ namespace astra_rp
 
                 // 1. 离开临界区，执行耗时推理（完美并发）
                 auto node = m_graph->nodes().at(current_node_id);
+
                 auto exec_res = node->execute();
                 if (exec_res.is_err())
                 {
@@ -131,6 +133,8 @@ namespace astra_rp
                 // 唤醒可能在等待的其他 worker
                 m_cv.notify_all();
             }
+
+            return ResultV<void>::Ok();
         }
     }
 }
