@@ -67,12 +67,12 @@ namespace astra_rp
             int32_t get_n_past() const { return m_n_past; }
 
         public:
-            bool feed_prompt(const Str &prompt);
-            bool feed_tokens(const Vec<Token> &tokens);
+            ResultV<void> feed_prompt(const Str &prompt);
+            ResultV<void> feed_tokens(const Vec<Token> &tokens);
 
-            Token generate_next();
+            ResultV<Token> generate_next();
 
-            Str generate(int32_t max_tokens = -1);
+            ResultV<Str> generate(int32_t max_tokens = -1);
         };
     }
 }

@@ -44,8 +44,8 @@ void test_streaming_inference(MulPtr<Model> model)
     // 3. 喂入 Prompt
     Str prompt = "User: Hello, count from 1 to 5.\nAssistant: ";
     ASTRA_LOG_INFO("Feeding Prompt: " + prompt);
-    bool ok = session.feed_prompt(prompt);
-    assert(ok);
+    auto feed_res = session.feed_prompt(prompt);
+    assert(feed_res.is_ok());
 
     // 4. 流式生成
     ASTRA_LOG_INFO("Streaming Response: ");
@@ -54,7 +54,9 @@ void test_streaming_inference(MulPtr<Model> model)
     // 终端可能会缓冲不完整的 UTF-8 字符（如中文），C++标准输出刷新可解决大部分问题
     while (!session.is_finished() && generated_count < 50)
     {
-        Token t = session.generate_next();
+        auto token_res = session.generate_next();
+        assert(token_res.is_ok());
+        auto t = token_res.unwrap();
         if (session.is_finished())
             break;
 
@@ -100,10 +102,12 @@ void test_session_clear_and_generate(MulPtr<Model> model)
 
     // [第 1 轮]
     Str prompt1 = "User: What is the capital of France?\nAssistant: ";
-    bool ok1 = session.feed_prompt(prompt1);
-    assert(ok1);
+    auto feed_res1 = session.feed_prompt(prompt1);
+    assert(feed_res1.is_ok());
 
-    Str response1 = session.generate(20); // 限制生成20个Token
+    auto response1_res = session.generate(20); // 限制生成20个Token
+    assert(response1_res.is_ok());
+    auto response1 = response1_res.unwrap();
     ASTRA_LOG_INFO("Round 1 Output: " + response1);
 
     // [清理会话] - 抹除历史记忆，避免 KV Cache OOM
@@ -114,10 +118,12 @@ void test_session_clear_and_generate(MulPtr<Model> model)
 
     //[第 2 轮]
     Str prompt2 = "User: What is the capital of Japan?\nAssistant: ";
-    bool ok2 = session.feed_prompt(prompt2);
-    assert(ok2);
+    auto feed_res2 = session.feed_prompt(prompt2);
+    assert(feed_res2.is_ok());
 
-    Str response2 = session.generate(20);
+    auto response2_res = session.generate(20);
+    assert(response2_res.is_ok());
+    auto response2 = response2_res.unwrap();
     ASTRA_LOG_INFO("Round 2 Output: " + response2);
 
     // 验证第二轮不受第一轮影响
