@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <future>
+#include <optional>
 
 #include "utils/types.hpp"
 #include "infer/session.hpp"
@@ -40,6 +41,9 @@ namespace astra_rp
             std::function<void(const utils::Error &)> on_error;
 
             std::promise<void> completion_signal;
+
+        public:
+            std::optional<utils::Error> fail_reason = std::nullopt;
 
         public:
             Task(MulPtr<Session> s) : session(std::move(s)) {}
