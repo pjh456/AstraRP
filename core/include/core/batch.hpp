@@ -33,7 +33,12 @@ namespace astra_rp
             Batch &operator=(Batch &&) noexcept;
 
         public:
-            void add(Token id, int32_t pos, const Vec<int32_t> &seq_ids, bool logits);
+            ResultV<void>
+            add(
+                Token id,
+                int32_t pos,
+                const Vec<int32_t> &seq_ids,
+                bool logits);
 
             void clear();
 

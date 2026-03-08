@@ -8,6 +8,7 @@
 #include "core/batch_manager.hpp"
 #include "core/tokenizer.hpp"
 #include "infer/engine.hpp"
+#include "utils/logger.hpp"
 
 namespace astra_rp
 {
@@ -32,9 +33,10 @@ namespace astra_rp
             auto batch_res = astra_rp::core::BatchManager::instance().acquire(1, 1);
             if (!batch_res.is_ok())
             {
-                throw std::runtime_error(
+                ASTRA_LOG_ERROR(
                     "Failed to acquire batch for Session initialization: " +
                     batch_res.unwrap_err().message());
+                throw std::runtime_error("Failed to acquire batch for Session initialization");
             }
             m_single_batch = batch_res.unwrap();
         }
@@ -126,7 +128,12 @@ namespace astra_rp
 
                     // last token needs to calculate logits for sampling.
                     bool require_logits = (token_idx == tokens.size() - 1);
-                    batch->add(tokens[token_idx], m_n_past, {m_seq_id}, require_logits);
+                    auto res = batch->add(tokens[token_idx], m_n_past, {m_seq_id}, require_logits);
+                    if (res.is_err())
+                    {
+                        ASTRA_LOG_ERROR("Failed to add token to batch: " + res.unwrap_err().message());
+                        return false;
+                    }
 
                     m_n_past++;
                     m_history_tokens.push_back(tokens[token_idx]);
@@ -157,7 +164,13 @@ namespace astra_rp
             }
 
             m_single_batch->clear();
-            m_single_batch->add(new_token, m_n_past, {m_seq_id}, true);
+            auto batch_res = m_single_batch->add(
+                new_token, m_n_past, {m_seq_id}, true);
+            if (batch_res.is_err())
+            {
+                ASTRA_LOG_ERROR("Failed to add token to single batch: " + batch_res.unwrap_err().message());
+                throw std::runtime_error("Failed to add token to single batch");
+            }
 
             auto res = Engine::instance().decode(m_ctx, m_single_batch);
 

@@ -46,7 +46,8 @@ namespace astra_rp
             return *this;
         }
 
-        void Batch::add(
+        ResultV<void>
+        Batch::add(
             Token id,
             int32_t pos,
             const Vec<int32_t> &seq_ids,
@@ -54,11 +55,22 @@ namespace astra_rp
         {
             auto i = m_batch.n_tokens;
             if (i >= m_max_tokens)
-                throw std::runtime_error("Batch token capacity exceeded");
+                return ResultV<void>::Err(
+                    utils::ErrorBuilder()
+                        .core()
+                        .batch_capacity_exceeded()
+                        .message("Batch token capacity exceeded (Max: " + std::to_string(m_max_tokens) + ")")
+                        .build());
 
             auto seq_size = seq_ids.size();
             if ((int32_t)seq_size > m_max_seqs)
-                throw std::runtime_error("Batch sequence capacity exceeded (seq_ids size > max_seqs)");
+                return ResultV<void>::Err(
+                    utils::ErrorBuilder()
+                        .core()
+                        .batch_capacity_exceeded()
+                        .message("Batch sequence capacity exceeded (Requested: " + std::to_string(seq_size) +
+                                 ", Max: " + std::to_string(m_max_seqs) + ")")
+                        .build());
 
             m_batch.token[i] = id;
             m_batch.pos[i] = pos;
@@ -70,14 +82,13 @@ namespace astra_rp
                 m_batch.seq_id[i][j] = seq_ids[j];
 
             m_batch.n_tokens++;
+
+            return ResultV<void>::Ok();
         }
 
         void Batch::clear()
         {
             m_batch.n_tokens = 0;
-
-            // if (m_batch.logits)
-            // memset(m_batch.logits, 0, sizeof(int8_t) * m_max_tokens);
 
             // TODO: clear embedding.
             // if (m_batch.embd)
