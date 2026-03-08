@@ -57,7 +57,7 @@ void test_thread_safety()
     // 注册多个监听器
     bus->subscribe_token([&](const Str &, const Str &)
                          { received_tokens++; });
-    bus->subscribe_error([&](const Str &, const Str &)
+    bus->subscribe_error([&](const Str &, utils::Error)
                          { received_errors++; });
 
     const int num_threads = 8;
@@ -74,7 +74,7 @@ void test_thread_safety()
                 if (j % 2 == 0)
                     bus->publish_token("Thread_" + std::to_string(i), "data");
                 else
-                    bus->publish_error("Thread_" + std::to_string(i), "err");
+                    bus->publish_error("Thread_" + std::to_string(i), utils::Error());
             } });
     }
 

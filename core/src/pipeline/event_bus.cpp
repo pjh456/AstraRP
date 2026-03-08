@@ -48,7 +48,7 @@ namespace astra_rp
                 cb(id, state);
         }
 
-        void EventBus::publish_error(const Str &id, const Str &msg)
+        void EventBus::publish_error(const Str &id, utils::Error err)
         {
             Vec<ErrorCallback> callbacks;
             {
@@ -56,7 +56,7 @@ namespace astra_rp
                 callbacks = m_error_subs;
             }
             for (auto &cb : callbacks)
-                cb(id, msg);
+                cb(id, err);
         }
     }
 }

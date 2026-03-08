@@ -24,7 +24,7 @@ namespace astra_rp
         public:
             using TokenCallback = std::function<void(const Str &id, const Str &text)>;
             using StateCallback = std::function<void(const Str &id, NodeState state)>;
-            using ErrorCallback = std::function<void(const Str &id, const Str &msg)>;
+            using ErrorCallback = std::function<void(const Str &id, utils::Error err)>;
 
         private:
             Vec<TokenCallback> m_token_subs;
@@ -45,7 +45,7 @@ namespace astra_rp
         public:
             void publish_token(const Str &id, const Str &text);
             void publish_state(const Str &id, NodeState state);
-            void publish_error(const Str &id, const Str &msg);
+            void publish_error(const Str &id, utils::Error err);
         };
     }
 }
