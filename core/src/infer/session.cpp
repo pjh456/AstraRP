@@ -97,9 +97,9 @@ namespace astra_rp
         {
             using namespace astra_rp::core;
 
-            auto tokens = Tokenizer::tokenize(m_model, prompt).unwrap();
-
-            return feed_tokens(tokens);
+            return Tokenizer::tokenize(m_model, prompt)
+                .and_then([this](const Vec<Token> &tokens)
+                          { return feed_tokens(tokens); });
         }
 
         ResultV<void> Session::feed_tokens(const Vec<Token> &tokens)
