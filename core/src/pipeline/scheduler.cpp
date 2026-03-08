@@ -87,7 +87,7 @@ namespace astra_rp
                         (m_ready_queue.empty() &&
                          m_active_tasks == 0) ||
                         m_stop)
-                        return;
+                        return ResultV<void>::Ok();
 
                     current_node_id = m_ready_queue.front();
                     m_ready_queue.pop();
