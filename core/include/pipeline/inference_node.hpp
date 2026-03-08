@@ -6,6 +6,7 @@
 #include "infer/session.hpp"
 #include "core/lora.hpp"
 #include "core/tokenizer.hpp"
+#include "utils/logger.hpp"
 
 namespace astra_rp
 {
@@ -47,22 +48,31 @@ namespace astra_rp
                     m_session->enable_lora(m_lora, m_lora_scale);
 
                 Str prompt = m_prompt_builder ? m_prompt_builder(m_inputs) : "";
-                m_session->feed_prompt(prompt);
+                TRY(m_session->feed_prompt(prompt));
 
                 Str full_text;
                 while (!m_session->is_finished())
                 {
-                    auto token_res = m_session->generate_next();
-                    if (token_res.is_err())
-                        return ResultV<void>::Err(token_res.unwrap_err());
-                    auto token = token_res.unwrap();
+                    ASSIGN_OR_RETURN(
+                        token,
+                        m_session->generate_next()
+                            .map_err(
+                                [](auto err)
+                                {
+                                    ASTRA_LOG_ERROR("Failed to generate next token: " + err.message());
+                                    return err;
+                                }));
 
-                    auto str_res =
+                    ASSIGN_OR_RETURN(
+                        token_str,
                         astra_rp::core::Tokenizer::
-                            detokenize(m_session->model(), {token});
-                    if (str_res.is_err())
-                        return ResultV<void>::Err(str_res.unwrap_err());
-                    auto token_str = str_res.unwrap();
+                            detokenize(m_session->model(), {token})
+                                .map_err(
+                                    [](auto err)
+                                    {
+                                        ASTRA_LOG_ERROR("Failed to detokenize generated token: " + err.message());
+                                        return err;
+                                    }));
 
                     full_text += token_str;
                     if (m_bus)
