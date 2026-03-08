@@ -4,11 +4,16 @@
 #include <source_location>
 #include <sstream>
 #include <string>
+#include <memory>
+
 #include "utils/result.hpp"
 
 namespace astra_rp
 {
     using Str = std::string;
+
+    template <typename T>
+    using MulPtr = std::shared_ptr<T>;
 
     namespace utils
     {
@@ -76,6 +81,7 @@ namespace astra_rp
             Str m_msg;
             Str m_context_id;
             std::source_location m_loc;
+            MulPtr<Error> m_cause = nullptr;
 
         public:
             Error() : m_loc(std::source_location::current()) {}
@@ -85,6 +91,7 @@ namespace astra_rp
             ErrorCode code() const noexcept { return m_code; }
             const Str &message() const noexcept { return m_msg; }
             const Str &context_id() const noexcept { return m_context_id; }
+            MulPtr<Error> cause() const noexcept { return m_cause; }
 
         public:
             Str to_string() const
@@ -101,6 +108,9 @@ namespace astra_rp
                     << " (at " << m_loc.file_name() << ":" << m_loc.line()
                     << " in " << m_loc.function_name() << ")";
 
+                if (m_cause)
+                    oss << "\n  Caused by: " << m_cause->to_string();
+
                 return oss.str();
             }
         };
@@ -115,6 +125,8 @@ namespace astra_rp
             {
                 m_err.m_loc = loc;
             }
+
+            ErrorBuilder(const Error &base_err) : m_err(base_err) {}
 
             Error build() const noexcept { return m_err; }
 
@@ -171,6 +183,20 @@ namespace astra_rp
             ErrorBuilder &context_id(Str ctx_id) noexcept
             {
                 m_err.m_context_id = std::move(ctx_id);
+                return *this;
+            }
+
+            ErrorBuilder &wrap(const Error &cause) noexcept
+            {
+                m_err.m_cause =
+                    std::make_shared<Error>(cause);
+                return *this;
+            }
+
+            ErrorBuilder &wrap(Error &&cause) noexcept
+            {
+                m_err.m_cause =
+                    std::make_shared<Error>(std::move(cause));
                 return *this;
             }
         };
