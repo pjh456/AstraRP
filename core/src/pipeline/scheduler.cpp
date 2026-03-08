@@ -5,6 +5,8 @@
 
 #include "pipeline/graph.hpp"
 
+#include "utils/logger.hpp"
+
 namespace astra_rp
 {
     namespace pipeline
@@ -93,14 +95,20 @@ namespace astra_rp
 
                 // 1. 离开临界区，执行耗时推理（完美并发）
                 auto node = m_graph->nodes().at(current_node_id);
-                bool success = node->execute();
+                auto exec_res = node->execute();
+                if (exec_res.is_err())
+                {
+                    // TODO: 通过 EventBus 上报错误事件
+                    auto err = exec_res.unwrap_err();
+                    ASTRA_LOG_ERROR("Node " + current_node_id + " execution failed: " + err.to_string());
+                }
 
                 // 2. 重新加锁更新图状态
                 {
                     std::lock_guard<std::mutex> lock(m_mtx);
                     m_active_tasks--;
 
-                    if (success)
+                    if (exec_res.is_ok())
                     {
                         auto it = m_graph->link_table().find(current_node_id);
                         if (it != m_graph->link_table().end())

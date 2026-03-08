@@ -42,7 +42,7 @@ namespace astra_rp
                 m_inputs[parent_id] = payload;
             }
 
-            virtual bool execute() = 0;
+            virtual ResultV<void> execute() = 0;
 
         protected:
             void update_state(NodeState s)

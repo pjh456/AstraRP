@@ -17,7 +17,7 @@ class DummyNode : public BaseNode
 {
 public:
     DummyNode(const Str &id) : BaseNode(id, nullptr) {}
-    bool execute() override { return true; } // Graph测试不调用它
+    ResultV<void> execute() override { return ResultV<void>::Ok(); } // Graph测试不调用它
 };
 
 // ---------------------------------------------------------

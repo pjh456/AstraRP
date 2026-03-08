@@ -27,7 +27,7 @@ public:
     MockTaskNode(const Str &id, int delay_ms = 50)
         : BaseNode(id, nullptr), m_delay_ms(delay_ms) {}
 
-    bool execute() override
+    ResultV<void> execute() override
     {
         update_state(NodeState::RUNNING);
 
@@ -45,7 +45,7 @@ public:
         m_output.output = combined + " DoneBy(" + m_id + ")";
 
         update_state(NodeState::FINISHED);
-        return true;
+        return ResultV<void>::Ok();
     }
 };
 

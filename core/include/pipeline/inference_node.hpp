@@ -39,46 +39,43 @@ namespace astra_rp
             void set_prompt_builder(auto builder) { m_prompt_builder = builder; }
 
         public:
-            bool execute() override
+            ResultV<void> execute() override
             {
                 update_state(NodeState::RUNNING);
 
-                try
+                if (m_lora)
+                    m_session->enable_lora(m_lora, m_lora_scale);
+
+                Str prompt = m_prompt_builder ? m_prompt_builder(m_inputs) : "";
+                m_session->feed_prompt(prompt);
+
+                Str full_text;
+                while (!m_session->is_finished())
                 {
-                    if (m_lora)
-                        m_session->enable_lora(m_lora, m_lora_scale);
+                    auto token_res = m_session->generate_next();
+                    if (token_res.is_err())
+                        return ResultV<void>::Err(token_res.unwrap_err());
+                    auto token = token_res.unwrap();
 
-                    Str prompt = m_prompt_builder ? m_prompt_builder(m_inputs) : "";
-                    m_session->feed_prompt(prompt);
+                    auto str_res =
+                        astra_rp::core::Tokenizer::
+                            detokenize(m_session->model(), {token});
+                    if (str_res.is_err())
+                        return ResultV<void>::Err(str_res.unwrap_err());
+                    auto token_str = str_res.unwrap();
 
-                    Str full_text;
-                    while (!m_session->is_finished())
-                    {
-                        auto token = m_session->generate_next();
-                        Str token_str =
-                            astra_rp::core::Tokenizer::
-                                detokenize(m_session->model(), {token});
-
-                        full_text += token_str;
-                        if (m_bus)
-                            m_bus->publish_token(m_id, token_str);
-                    }
-
-                    m_output.output = full_text;
-
-                    m_session->disable_lora();
-                    m_session->clear();
-
-                    update_state(NodeState::FINISHED);
-                    return true;
-                }
-                catch (const std::exception &e)
-                {
+                    full_text += token_str;
                     if (m_bus)
-                        m_bus->publish_error(m_id, e.what());
-                    update_state(NodeState::FAILED);
-                    return false;
+                        m_bus->publish_token(m_id, token_str);
                 }
+
+                m_output.output = full_text;
+
+                m_session->disable_lora();
+                m_session->clear();
+
+                update_state(NodeState::FINISHED);
+                return ResultV<void>::Ok();
             }
         };
     }
