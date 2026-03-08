@@ -118,7 +118,7 @@ namespace astra_rp
                     {
                         ASTRA_LOG_ERROR("Failed to tokenize prompt: " + err.message());
                         return utils::ErrorBuilder()
-                            .core()
+                            .infer()
                             .tokenize_failed()
                             .message("Failed to tokenize prompt")
                             .context_id("SeqID_" + std::to_string(m_seq_id))
@@ -144,7 +144,7 @@ namespace astra_rp
                         {
                             ASTRA_LOG_ERROR("Failed to acquire batch for feeding tokens: " + err.message());
                             return utils::ErrorBuilder()
-                                .core()
+                                .infer()
                                 .batch_capacity_exceeded()
                                 .message("Failed to acquire batch for feeding tokens. Required capacity: " + std::to_string(tokens.size()))
                                 .context_id("SeqID_" + std::to_string(m_seq_id))
@@ -176,7 +176,7 @@ namespace astra_rp
                                 {
                                     ASTRA_LOG_ERROR("Failed to add token to batch: " + err.message());
                                     return utils::ErrorBuilder()
-                                        .core()
+                                        .infer()
                                         .batch_capacity_exceeded()
                                         .message("Failed to add token to batch")
                                         .wrap(std::move(err))
@@ -235,7 +235,7 @@ namespace astra_rp
                         {
                             ASTRA_LOG_ERROR("Failed to add token to single batch: " + err.message());
                             return utils::ErrorBuilder()
-                                .core()
+                                .infer()
                                 .batch_capacity_exceeded()
                                 .message("Failed to add token to single batch")
                                 .wrap(std::move(err))
@@ -309,7 +309,7 @@ namespace astra_rp
                     {
                         ASTRA_LOG_ERROR("Failed to detokenize generated tokens: " + err.message());
                         return utils::ErrorBuilder()
-                            .core()
+                            .infer()
                             .detokenize_failed()
                             .message("Failed to detokenize generated tokens")
                             .context_id("SeqID_" + std::to_string(m_seq_id))
