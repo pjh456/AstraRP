@@ -62,7 +62,13 @@ namespace astra_rp
                 unparse_special);
 
             if (str_count <= 0)
-                throw std::runtime_error("detokenize failed!");
+                return ResultV<Str>::Err(
+                    utils::ErrorBuilder()
+                        .core()
+                        .detokenize_failed()
+                        .message("llama_detokenize returned non-positive status (Buffer too small or invalid tokens)")
+                        .context_id(model->name())
+                        .build());
 
             Str result;
             result.resize(str_count);
