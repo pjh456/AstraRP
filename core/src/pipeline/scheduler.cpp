@@ -61,6 +61,9 @@ namespace astra_rp
 
             m_workers.clear();
 
+            if (m_fatal_error.has_value())
+                return ResultV<void>::Err(m_fatal_error.value());
+
             return ResultV<void>::Ok();
         }
 
@@ -100,9 +103,28 @@ namespace astra_rp
                 auto exec_res = node->execute();
                 if (exec_res.is_err())
                 {
-                    // TODO: 通过 EventBus 上报错误事件
                     auto err = exec_res.unwrap_err();
                     ASTRA_LOG_ERROR("Node " + current_node_id + " execution failed: " + err.to_string());
+
+                    std::lock_guard<std::mutex> lock(m_mtx);
+                    if (!m_fatal_error.has_value())
+                    {
+                        // 保证只记录第一个导致崩溃的错误
+                        m_fatal_error = err;
+                        m_stop = true; // 【核心】熔断标志：不再接受新任务
+
+                        // 使用 EventBus 发布全局调度器错误
+                        if (m_bus)
+                            m_bus->publish_error(
+                                "SCHEDULER",
+                                utils::ErrorBuilder()
+                                    .infer()
+                                    .message("Pipeline halted due to node failure: " + current_node_id)
+                                    .wrap(std::move(err))
+                                    .build());
+                    }
+                    m_cv.notify_all();          // 唤醒所有等待的 worker 让它们安全退出
+                    return ResultV<void>::Ok(); // 线程安全退出
                 }
 
                 // 2. 重新加锁更新图状态
