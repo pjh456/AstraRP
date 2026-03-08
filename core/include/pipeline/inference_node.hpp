@@ -53,59 +53,54 @@ namespace astra_rp
                     m_prompt_builder
                         ? m_prompt_builder(m_inputs)
                         : "";
+
                 ASSIGN_OR_RETURN(
-                    prompt_tokens,
-                    core::Tokenizer::tokenize(
-                        m_session->model(),
-                        prompt,
-                        true,
-                        true));
-
-                auto task =
-                    std::make_shared<infer::Task>(m_session);
-                task->pending_tokens = std::move(prompt_tokens);
-                task->max_tokens = 512; // TODO: 扩容
-
-                task->on_token = [this](Token t) -> bool
-                {
-                    auto str_res =
-                        core::Tokenizer::detokenize(
-                            m_session->model(),
-                            {t},
-                            false,
-                            false);
-                    if (str_res.is_err())
-                        return false;
-
-                    Str text = str_res.unwrap();
-                    m_output.output += text;
-
-                    if (m_bus)
-                        m_bus->publish_token(m_id, text);
-
-                    return true; // 继续生成
-                };
-
-                task->on_error = [this](const utils::Error &err)
-                {
-                    ASTRA_LOG_ERROR("Node Execution failed: " + err.to_string());
-                    if (m_bus)
-                        m_bus->publish_error(m_id, err);
-                };
-
-                task->on_finish = [this]()
-                {
-                    if (m_lora)
-                        m_session->disable_lora();
-                    update_state(NodeState::FINISHED);
-                };
+                    task,
+                    infer::TaskBuilder(m_session)
+                        .prompt(prompt)
+                        // .max_tokens(100) // 默认智能推导
+                        .on_text_generated(
+                            [this](const Str &text)
+                            {
+                                m_output.output += text;
+                                if (m_bus)
+                                    m_bus->publish_token(m_id, text);
+                                return true;
+                            })
+                        .on_error(
+                            [this](const utils::Error &err)
+                            {
+                                ASTRA_LOG_ERROR(
+                                    "Node Execution failed: " +
+                                    err.to_string());
+                                if (m_bus)
+                                    m_bus->publish_error(m_id, err);
+                            })
+                        .on_finish(
+                            [this]()
+                            {
+                                if (m_lora)
+                                    m_session->disable_lora();
+                                update_state(NodeState::FINISHED);
+                            })
+                        .build()
+                        .map_err(
+                            [this](auto err)
+                            {
+                                update_state(NodeState::FAILED);
+                                return utils::Failure(
+                                    utils::ErrorBuilder()
+                                        .infer()
+                                        .node_execution_failed()
+                                        .wrap(err)
+                                        .build());
+                            }));
 
                 infer::Engine::instance().submit(task);
-
-                auto future = task->completion_signal.get_future();
-                future.wait();
+                task->wait();
 
                 update_state(NodeState::FINISHED);
+
                 return ResultV<void>::Ok();
             }
         };

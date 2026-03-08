@@ -43,44 +43,42 @@ void test_streaming_inference(MulPtr<Model> model)
     auto prompt_tokens = Tokenizer::tokenize(model, prompt, true, true).unwrap();
 
     // 3. 构建推理任务 (Task)
-    auto task = std::make_shared<Task>(session);
-    task->pending_tokens = std::move(prompt_tokens);
-    task->max_tokens = 50; // 限制最多生成 50 个 Token
-
     int generated_count = 0;
 
-    // 4. 绑定回调接口 (由 Engine 的后台线程触发)
-    task->on_token = [&](Token t) -> bool
-    {
-        // 将 Engine 扔出来的 Token 转回字符串
-        auto piece = Tokenizer::detokenize(model, {t}, false, false).unwrap();
+    auto task_res =
+        TaskBuilder(session)
+            .prompt(prompt)
+            .max_tokens(50) // 手动限制一下，不然它会自动跑到 Context 上限
+            .on_text_generated(
+                [&](const Str &text)
+                {
+                    std::cout << text << std::flush;
+                    generated_count++;
+                    return true;
+                })
+            .on_finish(
+                []()
+                {
+                    std::cout << std::endl; // 结束时换行
+                })
+            .on_error(
+                [](const utils::Error &err)
+                {
+                    ASTRA_LOG_ERROR("Task failed during execution: " + err.to_string());
+                })
+            .build();
 
-        // 实时打印 (终端缓冲刷新)
-        std::cout << piece << std::flush;
-        generated_count++;
+    assert(task_res.is_ok());
 
-        // 返回 true 表示允许 Engine 继续生成
-        return true;
-    };
-
-    task->on_finish = []()
-    {
-        std::cout << std::endl; // 结束时换行
-    };
-
-    task->on_error = [](const utils::Error &err)
-    {
-        ASTRA_LOG_ERROR("Task failed during execution: " + err.to_string());
-    };
-
+    auto task = task_res.unwrap();
     // 5. 将任务提交给后台 Engine (非阻塞)
     Engine::instance().submit(task);
 
     // 6. 主线程挂起等待，直到 Engine 后台运算完成并 set_value
-    task->completion_signal.get_future().wait();
+    task->wait();
 
     // 7. 验证状态突变
-    assert(task->state == TaskState::FINISHED);
+    assert(task->state() == TaskState::FINISHED);
     assert(session->n_past() > 0); // 确认 Session 里的 KV Cache 进度已经被 Engine 推进
 
     ASTRA_LOG_DEBUG("Streaming generation finished. Tokens generated: " + std::to_string(generated_count));
@@ -100,28 +98,30 @@ void test_session_clear_and_generate(MulPtr<Model> model)
     // 封装一个简单的同步生成辅助函数，展示如何复用 Task 逻辑
     auto run_prompt = [&](const Str &prompt) -> Str
     {
-        auto prompt_tokens = Tokenizer::tokenize(model, prompt, true, true).unwrap();
-
-        auto task = std::make_shared<Task>(session);
-        task->pending_tokens = std::move(prompt_tokens);
-        task->max_tokens = 20;
-
         Str output_buffer;
 
-        task->on_token = [&](Token t) -> bool
-        {
-            output_buffer += Tokenizer::detokenize(model, {t}, false, false).unwrap();
-            return true;
-        };
-
-        task->on_error = [](const utils::Error &err)
-        {
-            ASTRA_LOG_ERROR("Task failed: " + err.to_string());
-        };
+        auto task_res =
+            TaskBuilder(session)
+                .prompt(prompt)
+                .max_tokens(20)
+                .on_text_generated(
+                    [&](auto str) -> bool
+                    {
+                        output_buffer += str;
+                        return true;
+                    })
+                .on_error(
+                    [](auto err)
+                    {
+                        ASTRA_LOG_ERROR("Task failed: " + err.to_string());
+                    })
+                .build();
+        assert(task_res.is_ok());
+        auto task = task_res.unwrap();
 
         // 提交并等待
         Engine::instance().submit(task);
-        task->completion_signal.get_future().wait();
+        task->wait();
 
         return output_buffer;
     };

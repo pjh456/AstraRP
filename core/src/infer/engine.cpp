@@ -53,7 +53,7 @@ namespace astra_rp
         {
             {
                 std::lock_guard<std::mutex> lock(m_mtx);
-                task->state = TaskState::PENDING;
+                task->m_state = TaskState::PENDING;
                 m_pending_queue.push(task);
             }
             m_cv.notify_one(); // 唤醒后台线程
@@ -95,7 +95,7 @@ namespace astra_rp
                 // 2. 轮转调度：取出队首任务进行处理
                 auto task = active_tasks.front();
                 active_tasks.pop_front();
-                task->state = TaskState::RUNNING;
+                task->m_state = TaskState::RUNNING;
 
                 auto session = task->session;
                 auto ctx = session->context();
@@ -107,7 +107,7 @@ namespace astra_rp
                 if (tokens_to_process == 0)
                 {
                     // 没有需要处理的 Token，可能状态异常，直接结束
-                    task->state = TaskState::FINISHED;
+                    task->m_state = TaskState::FINISHED;
                     if (task->on_finish)
                         task->on_finish();
                     task->completion_signal.set_value();
@@ -118,7 +118,7 @@ namespace astra_rp
                 auto batch_res = core::BatchManager::instance().acquire(tokens_to_process, 1);
                 if (batch_res.is_err())
                 {
-                    task->state = TaskState::FAILED;
+                    task->m_state = TaskState::FAILED;
                     if (task->on_error)
                         task->on_error(batch_res.unwrap_err());
                     task->completion_signal.set_value(); // 解除阻塞
@@ -142,7 +142,7 @@ namespace astra_rp
 
                     if (add_res.is_err())
                     {
-                        task->state = TaskState::FAILED;
+                        task->m_state = TaskState::FAILED;
                         if (task->on_error)
                             task->on_error(add_res.unwrap_err());
                         task->completion_signal.set_value();
@@ -158,7 +158,7 @@ namespace astra_rp
                 auto dec_res = decode(ctx, batch);
                 if (dec_res.is_err())
                 {
-                    task->state = TaskState::FAILED;
+                    task->m_state = TaskState::FAILED;
                     if (task->on_error)
                         task->on_error(dec_res.unwrap_err());
                     task->completion_signal.set_value();
@@ -191,7 +191,7 @@ namespace astra_rp
                 auto vocab = llama_model_get_vocab(session->model()->raw());
                 if (llama_vocab_is_eog(vocab, next_token))
                 {
-                    task->state = TaskState::FINISHED;
+                    task->m_state = TaskState::FINISHED;
                     if (task->on_finish)
                         task->on_finish();
                     task->completion_signal.set_value(); // 任务圆满完成
@@ -210,7 +210,7 @@ namespace astra_rp
                 // 10. 检查生成限制与结束条件
                 if (!continue_gen || (task->max_tokens > 0 && task->generated_count >= task->max_tokens))
                 {
-                    task->state = TaskState::FINISHED;
+                    task->m_state = TaskState::FINISHED;
                     if (task->on_finish)
                         task->on_finish();
                     task->completion_signal.set_value();
