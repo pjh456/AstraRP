@@ -5,8 +5,23 @@ project(AstraRP_core VERSION 0.1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 如果没指定构建类型，强制默认为 RelWithDebInfo
+# RelWithDebInfo 既有 -O2 优化 (快)，又有 debug symbol (能调试)。
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "No build type selected, defaulting to RelWithDebInfo for speed.")
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(IS_ARM TRUE)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86" OR CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64")
+    set(IS_X86 TRUE)
+endif()
+
 # 2. CPU 指令集优化：开启高度优化并启用原生指令集 (AVX2/AVX512等)
 if(MSVC)
+    add_compile_options(/utf-8 /MP) # /MP 开启多核编译
+
     # Windows / MSVC 优化
     add_compile_options(
         $<$<CONFIG:Release>:/O2>
@@ -22,6 +37,8 @@ if(MSVC)
         $<$<CONFIG:RelWithDebInfo>:/LTCG>
     ) # 开启链接时代码生成
 else()
+    add_compile_options(-march=native -mtune=native)
+
     # Linux / macOS (GCC/Clang) 优化
     # -O3: 最高级优化
     # -march=native: 让编译器针对你当前的 CPU 指令集进行全速优化
@@ -32,13 +49,21 @@ else()
 endif()
 
 # 3. 引入 llama.cpp 目录并开启内部优化开关
-set(LLAMA_HTTPLIB OFF CACHE BOOL "Disable llama.cpp httplib" FORCE)
-set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "Disable llama.cpp examples" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "Disable llama.cpp server" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "Disable llama.cpp tests" FORCE)
-set(GGML_NATIVE ON CACHE BOOL "Enable native optimization" FORCE)
 set(LLAMA_BUILD_COMMON OFF CACHE BOOL "Build common library" FORCE)
+
+set(LLAMA_CURL OFF CACHE BOOL "Disable libcurl dependency" FORCE)
+set(GGML_RPC OFF CACHE BOOL "Disable RPC support" FORCE)
+set(LLAMA_STANDALONE OFF CACHE BOOL "Tell llama.cpp it is being included" FORCE)
+
+set(GGML_NATIVE ON CACHE BOOL "Enable native optimization" FORCE)
+set(GGML_OPENMP ON CACHE BOOL "Enable OpenMP" FORCE)
+
+set(LLAMA_HTTPLIB OFF CACHE BOOL "Disable llama.cpp httplib" FORCE)
+set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
+
 set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama.cpp)
 add_subdirectory(${LLAMA_DIR})
 
