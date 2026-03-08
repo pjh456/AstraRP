@@ -6,6 +6,8 @@
 #include "infer/session.hpp"
 #include "core/lora.hpp"
 #include "core/tokenizer.hpp"
+#include "infer/task.hpp"
+#include "infer/engine.hpp"
 #include "utils/logger.hpp"
 
 namespace astra_rp
@@ -47,54 +49,61 @@ namespace astra_rp
                 if (m_lora)
                     m_session->enable_lora(m_lora, m_lora_scale);
 
-                Str prompt = m_prompt_builder ? m_prompt_builder(m_inputs) : "";
-                TRY(m_session->feed_prompt(prompt));
+                Str prompt =
+                    m_prompt_builder
+                        ? m_prompt_builder(m_inputs)
+                        : "";
+                ASSIGN_OR_RETURN(
+                    prompt_tokens,
+                    core::Tokenizer::tokenize(
+                        m_session->model(),
+                        prompt,
+                        true,
+                        true));
 
-                Str full_text;
-                while (!m_session->is_finished())
+                auto task =
+                    std::make_shared<infer::Task>(m_session);
+                task->pending_tokens = std::move(prompt_tokens);
+                task->max_tokens = 512; // TODO: 扩容
+
+                task->on_token = [this](Token t) -> bool
                 {
-                    ASSIGN_OR_RETURN(
-                        token,
-                        m_session->generate_next()
-                            .map_err(
-                                [&](auto err)
-                                {
-                                    ASTRA_LOG_ERROR("Failed to generate next token: " + err.message());
-                                    return utils::ErrorBuilder()
-                                        .infer()
-                                        .engine_decode_failed()
-                                        .message("Failed to generate next token")
-                                        .context_id("SeqID_" + std::to_string(m_session->get_n_past()))
-                                        .wrap(std::move(err))
-                                        .build();
-                                }));
+                    auto str_res =
+                        core::Tokenizer::detokenize(
+                            m_session->model(),
+                            {t},
+                            false,
+                            false);
+                    if (str_res.is_err())
+                        return false;
 
-                    ASSIGN_OR_RETURN(
-                        token_str,
-                        astra_rp::core::Tokenizer::
-                            detokenize(m_session->model(), {token})
-                                .map_err(
-                                    [&](auto err)
-                                    {
-                                        ASTRA_LOG_ERROR("Failed to detokenize generated token: " + err.message());
-                                        return utils::ErrorBuilder()
-                                            .core()
-                                            .detokenize_failed()
-                                            .message("Failed to detokenize generated token")
-                                            .context_id("SeqID_" + std::to_string(m_session->get_n_past()))
-                                            .wrap(std::move(err))
-                                            .build();
-                                    }));
+                    Str text = str_res.unwrap();
+                    m_output.output += text;
 
-                    full_text += token_str;
                     if (m_bus)
-                        m_bus->publish_token(m_id, token_str);
-                }
+                        m_bus->publish_token(m_id, text);
 
-                m_output.output = full_text;
+                    return true; // 继续生成
+                };
 
-                m_session->disable_lora();
-                m_session->clear();
+                task->on_error = [this](const utils::Error &err)
+                {
+                    ASTRA_LOG_ERROR("Node Execution failed: " + err.to_string());
+                    if (m_bus)
+                        m_bus->publish_error(m_id, err);
+                };
+
+                task->on_finish = [this]()
+                {
+                    if (m_lora)
+                        m_session->disable_lora();
+                    update_state(NodeState::FINISHED);
+                };
+
+                infer::Engine::instance().submit(task);
+
+                auto future = task->completion_signal.get_future();
+                future.wait();
 
                 update_state(NodeState::FINISHED);
                 return ResultV<void>::Ok();
