@@ -131,8 +131,9 @@ namespace astra_rp
                 for (size_t i = 0; i < tokens_to_process; ++i)
                 {
                     // 只有这批 pending_tokens 的*最后一个*才需要计算 Logits 用于下一次采样
-                    bool is_absolute_last = (i == tokens_to_process - 1) &&
-                                            (tokens_to_process == task->pending_tokens.size());
+                    bool is_absolute_last =
+                        (i == tokens_to_process - 1) &&
+                        (tokens_to_process == task->pending_tokens.size());
 
                     auto add_res = batch->add(
                         task->pending_tokens[i],
@@ -143,6 +144,7 @@ namespace astra_rp
                     if (add_res.is_err())
                     {
                         task->m_state = TaskState::FAILED;
+                        task->fail_reason = add_res.unwrap_err();
                         if (task->on_error)
                             task->on_error(add_res.unwrap_err());
                         task->completion_signal.set_value();
@@ -159,6 +161,7 @@ namespace astra_rp
                 if (dec_res.is_err())
                 {
                     task->m_state = TaskState::FAILED;
+                    task->fail_reason = dec_res.unwrap_err();
                     if (task->on_error)
                         task->on_error(dec_res.unwrap_err());
                     task->completion_signal.set_value();
