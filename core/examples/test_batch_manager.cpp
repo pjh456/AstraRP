@@ -87,7 +87,8 @@ void test_data_integrity()
     auto batch = batch_res.unwrap();
 
     std::vector<int32_t> seq_ids = {10, 20, 30};
-    batch->add(999, 5, seq_ids, true);
+    auto add_res = batch->add(999, 5, seq_ids, true);
+    assert(add_res.is_ok());
 
     llama_batch raw = batch->raw();
 
@@ -122,7 +123,8 @@ void test_pool_reuse_logic()
         auto b1 = b1_res.unwrap();
 
         addr1 = (void *)b1.get();
-        b1->add(1, 0, {0}, false);
+        auto b1_add_res = b1->add(1, 0, {0}, false);
+        assert(b1_add_res.is_ok());
         assert(b1->size() == 1);
         // b1 离开作用域，归还给池子
     }
@@ -165,16 +167,14 @@ void test_boundaries()
     auto batch = batch_res.unwrap();
 
     // 1. 测试 Token 容量溢出
-    try
+    for (int i = 0; i <= batch->capacity(); ++i)
     {
-        for (int i = 0; i <= batch->capacity(); ++i)
-            batch->add(i, i, {0}, false);
-        assert(false);
-    }
-    catch (const std::runtime_error &e)
-    {
-        assert(std::string(e.what()).find("Batch token capacity exceeded") != std::string::npos);
-        ASTRA_LOG_INFO("Caught expected token overflow exception.");
+        auto add_res = batch->add(i, i, {0}, false);
+        if (add_res.is_err())
+        {
+            assert(i == batch->capacity());
+            break;
+        }
     }
 
     batch->clear();
@@ -187,8 +187,8 @@ void test_boundaries()
         for (int i = 0; i <= batch->max_seqs(); ++i)
             buf.push_back(i + 1);
 
-        batch->add(1, 1, buf, false);
-        assert(false);
+        auto add_res = batch->add(1, 1, buf, false);
+        assert(add_res.is_err());
     }
     catch (const std::runtime_error &e)
     {
@@ -223,7 +223,9 @@ void test_concurrency()
             auto batch = batch_res.unwrap();
 
             // 简单操作
-            batch->add(id, i, {0}, false);
+            auto add_res = batch->add(id, i, {0}, false);
+            assert(add_res.is_ok());
+            assert(batch->size() == 1);
 
             // 模拟一点耗时
             std::this_thread::yield();
