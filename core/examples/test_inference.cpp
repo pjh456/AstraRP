@@ -9,7 +9,7 @@
 
 #include "core/model_manager.hpp"
 #include "core/context_params.hpp"
-#include "core/sampler.hpp"
+#include "core/sampler_chain.hpp"
 #include "core/sampler_params.hpp"
 #include "core/tokenizer.hpp"
 #include "infer/session.hpp"
@@ -34,8 +34,13 @@ void test_streaming_inference(MulPtr<Model> model)
             .context_size(2048)
             .batch_size(512) // n_batch: Engine 会据此动态分块处理长文本
             .build();
-    auto sampler = SamplerBuilder().greedy().build().unwrap();
-    auto session = Session::create(model, ctx_params, std::move(sampler), 0).unwrap();
+    auto sampler_res = SamplerChainBuilder().greedy().build();
+    assert(sampler_res.is_ok());
+    auto sampler = std::move(sampler_res.unwrap());
+
+    auto session_res = Session::create(model, ctx_params, std::move(sampler), 0);
+    assert(session_res.is_ok());
+    auto session = std::move(session_res.unwrap());
 
     // 2. 准备 Prompt 并将其转换为 Token
     Str prompt = "User: Hello, count from 1 to 5.\nAssistant: ";
@@ -92,8 +97,14 @@ void test_session_clear_and_generate(MulPtr<Model> model)
     ASTRA_LOG_INFO("--- Test 2: Session Clear & Full Generate (Async Engine) ---");
 
     auto ctx_params = ContextParamsBuilder().context_size(2048).batch_size(512).build();
-    auto sampler = SamplerBuilder().top_k(40).top_p(0.9f, 1).temperature(0.7f).seed(1337).build().unwrap();
-    auto session = Session::create(model, ctx_params, std::move(sampler), 0).unwrap();
+
+    auto sampler_res = SamplerChainBuilder().top_k(40).top_p(0.9f, 1).temperature(0.7f).seed(1337).build();
+    assert(sampler_res.is_ok());
+    auto sampler = sampler_res.unwrap();
+
+    auto session_res = Session::create(model, ctx_params, std::move(sampler), 0);
+    assert(session_res.is_ok());
+    auto session = session_res.unwrap();
 
     // 封装一个简单的同步生成辅助函数，展示如何复用 Task 逻辑
     auto run_prompt = [&](const Str &prompt) -> Str

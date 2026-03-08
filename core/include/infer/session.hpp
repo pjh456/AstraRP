@@ -6,7 +6,7 @@
 #include "core/context_params.hpp"
 #include "core/lora.hpp"
 #include "core/context.hpp"
-#include "core/sampler.hpp"
+#include "core/sampler_chain.hpp"
 #include "core/batch_manager.hpp"
 
 namespace astra_rp
@@ -18,7 +18,7 @@ namespace astra_rp
         private:
             MulPtr<astra_rp::core::Model> m_model;
             MulPtr<astra_rp::core::Context> m_ctx;
-            astra_rp::core::Sampler m_sampler;
+            astra_rp::core::SamplerChain m_sampler;
             MulPtr<astra_rp::core::LoRA> m_lora = nullptr;
 
             int32_t m_seq_id;
@@ -31,7 +31,7 @@ namespace astra_rp
         private:
             Session(
                 MulPtr<astra_rp::core::Model> model,
-                astra_rp::core::Sampler &&sampler,
+                astra_rp::core::SamplerChain &&sampler,
                 int32_t seq_id);
 
         public:
@@ -39,7 +39,7 @@ namespace astra_rp
             create(
                 MulPtr<astra_rp::core::Model> model,
                 astra_rp::core::ContextParams ctx_params,
-                astra_rp::core::Sampler &&sampler,
+                astra_rp::core::SamplerChain &&sampler,
                 int32_t seq_id = 0);
 
             ~Session();
@@ -48,7 +48,7 @@ namespace astra_rp
             MulPtr<astra_rp::core::Model> model() const noexcept { return m_model; }
             MulPtr<astra_rp::core::Context> context() const noexcept { return m_ctx; }
             MulPtr<astra_rp::core::LoRA> lora() const noexcept { return m_lora; }
-            astra_rp::core::Sampler &sampler() noexcept { return m_sampler; }
+            astra_rp::core::SamplerChain &sampler() noexcept { return m_sampler; }
 
             int32_t seq_id() const noexcept { return m_seq_id; }
             int32_t n_past() const noexcept { return m_n_past; }

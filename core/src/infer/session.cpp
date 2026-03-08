@@ -17,7 +17,7 @@ namespace astra_rp
     {
         Session::Session(
             MulPtr<astra_rp::core::Model> model,
-            astra_rp::core::Sampler &&sampler,
+            astra_rp::core::SamplerChain &&sampler,
             int32_t seq_id)
             : m_model(model),
               m_ctx(nullptr),
@@ -31,7 +31,7 @@ namespace astra_rp
         Session::create(
             MulPtr<astra_rp::core::Model> model,
             astra_rp::core::ContextParams ctx_params,
-            astra_rp::core::Sampler &&sampler,
+            astra_rp::core::SamplerChain &&sampler,
             int32_t seq_id)
         {
             using namespace astra_rp::core;

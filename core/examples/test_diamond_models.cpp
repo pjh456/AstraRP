@@ -44,25 +44,25 @@ int main()
             .build();
 
     auto sampler_res =
-        core::SamplerBuilder()
+        core::SamplerChainBuilder()
             .greedy()
             .build();
     assert(sampler_res.is_ok());
-    auto sampler = sampler_res.unwrap();
+    auto sampler = std::move(sampler_res.unwrap());
 
-    auto s1_res = infer::Session::create(model, ctx_params, core::Sampler(sampler), 0);
+    auto s1_res = infer::Session::create(model, ctx_params, core::SamplerChain(sampler), 0);
     assert(s1_res.is_ok());
     auto s1 = s1_res.unwrap();
 
-    auto s2_res = infer::Session::create(model, ctx_params, core::Sampler(sampler), 1);
+    auto s2_res = infer::Session::create(model, ctx_params, core::SamplerChain(sampler), 1);
     assert(s2_res.is_ok());
     auto s2 = s2_res.unwrap();
 
-    auto s3_res = infer::Session::create(model, ctx_params, core::Sampler(sampler), 2);
+    auto s3_res = infer::Session::create(model, ctx_params, core::SamplerChain(sampler), 2);
     assert(s3_res.is_ok());
     auto s3 = s3_res.unwrap();
 
-    auto s4_res = infer::Session::create(model, ctx_params, core::Sampler(sampler), 3);
+    auto s4_res = infer::Session::create(model, ctx_params, core::SamplerChain(sampler), 3);
     assert(s4_res.is_ok());
     auto s4 = s4_res.unwrap();
 
