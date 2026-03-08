@@ -99,6 +99,12 @@ namespace astra_rp
                 infer::Engine::instance().submit(task);
                 task->wait();
 
+                if (task->state() == infer::TaskState::FAILED)
+                {
+                    update_state(NodeState::FAILED);
+                    return ResultV<void>::Err(task->fail_reason.value());
+                }
+
                 update_state(NodeState::FINISHED);
 
                 return ResultV<void>::Ok();
