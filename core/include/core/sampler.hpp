@@ -51,11 +51,16 @@ namespace astra_rp
             SamplerBuilder(SamplerParams params);
             SamplerBuilder() = default;
 
-            Sampler build() const
+            ResultV<Sampler> build() const
             {
                 if (!m_has_selector)
-                    throw std::logic_error("Sampler chain must end with a selector like greedy() or seed()");
-                return m_sampler;
+                    return ResultV<Sampler>::Err(
+                        utils::ErrorBuilder()
+                            .infer()
+                            .sampler_configuration_error()
+                            .message("Sampler chain must end with a selector like greedy() or seed()")
+                            .build());
+                return ResultV<Sampler>::Ok(m_sampler);
             }
 
         public:

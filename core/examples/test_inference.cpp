@@ -34,7 +34,9 @@ void test_streaming_inference(MulPtr<Model> model)
             .threads_batch(4)
             .flash_attention(true)
             .build();
-    auto sampler = SamplerBuilder().greedy().build(); // 使用贪婪搜索，保证结果确定性
+    auto sampler_res = SamplerBuilder().greedy().build(); // 使用贪婪搜索，保证结果确定性
+    assert(sampler_res.is_ok());
+    auto sampler = sampler_res.unwrap();
 
     // 2. 建立会话
     Session session(model, ctx_params, std::move(sampler), 0);
@@ -84,13 +86,15 @@ void test_session_clear_and_generate(MulPtr<Model> model)
             .threads_batch(4)
             .flash_attention(true)
             .build();
-    auto sampler =
+    auto sampler_res =
         SamplerBuilder()
             .top_k(40)
             .top_p(0.9f, 1)
             .temperature(0.7f)
             .seed(1337) // <--- 加入随机数种子，它是真正的分布采样器
             .build();
+    assert(sampler_res.is_ok());
+    auto sampler = sampler_res.unwrap();
 
     Session session(model, ctx_params, std::move(sampler), 0);
 
