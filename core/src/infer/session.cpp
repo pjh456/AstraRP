@@ -24,12 +24,20 @@ namespace astra_rp
                             .acquire(model, ctx_params)
                             .unwrap()),
               m_sampler(std::move(sampler)),
-              m_single_batch(
-                  astra_rp::core::BatchManager::instance().acquire(1, 1)),
               m_seq_id(seq_id),
               m_n_past(0),
               m_is_finished(false),
-              m_history_tokens() {}
+              m_history_tokens()
+        {
+            auto batch_res = astra_rp::core::BatchManager::instance().acquire(1, 1);
+            if (!batch_res.is_ok())
+            {
+                throw std::runtime_error(
+                    "Failed to acquire batch for Session initialization: " +
+                    batch_res.unwrap_err().message());
+            }
+            m_single_batch = batch_res.unwrap();
+        }
 
         Session::~Session() = default;
 
@@ -100,7 +108,10 @@ namespace astra_rp
 
             uint32_t max_batch_size = llama_n_batch(m_ctx->raw());
 
-            auto batch = BatchManager::instance().acquire(tokens.size(), 1);
+            auto batch_res = BatchManager::instance().acquire(tokens.size(), 1);
+            if (batch_res.is_err())
+                return false;
+            auto batch = batch_res.unwrap();
 
             for (size_t i = 0; i < tokens.size(); i += max_batch_size)
             {

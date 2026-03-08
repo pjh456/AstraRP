@@ -82,7 +82,9 @@ using namespace astra_rp::core;
 void test_data_integrity()
 {
     auto &manager = BatchManager::instance();
-    auto batch = manager.acquire(128, 4); // 需要支持每个 token 属于 4 个序列
+    auto batch_res = manager.acquire(128, 4); // 需要支持每个 token 属于 4 个序列
+    assert(batch_res.is_ok());
+    auto batch = batch_res.unwrap();
 
     std::vector<int32_t> seq_ids = {10, 20, 30};
     batch->add(999, 5, seq_ids, true);
@@ -115,7 +117,10 @@ void test_pool_reuse_logic()
 
     // 作用域 1
     {
-        auto b1 = manager.acquire(512);
+        auto b1_res = manager.acquire(512);
+        assert(b1_res.is_ok());
+        auto b1 = b1_res.unwrap();
+
         addr1 = (void *)b1.get();
         b1->add(1, 0, {0}, false);
         assert(b1->size() == 1);
@@ -124,7 +129,10 @@ void test_pool_reuse_logic()
 
     // 作用域 2：申请相同规格，应该复用
     {
-        auto b2 = manager.acquire(512);
+        auto b2_res = manager.acquire(512);
+        assert(b2_res.is_ok());
+        auto b2 = b2_res.unwrap();
+
         void *addr2 = (void *)b2.get();
 
         assert(addr1 == addr2);  // 地址必须相同
@@ -133,7 +141,10 @@ void test_pool_reuse_logic()
 
     // 作用域 3：申请更大规格，不应复用小的
     {
-        auto b3 = manager.acquire(1024); // 此时池子里有一个 512 的
+        auto b3_res = manager.acquire(1024); // 此时池子里有一个 512 的
+        assert(b3_res.is_ok());
+        auto b3 = b3_res.unwrap();
+
         void *addr3 = (void *)b3.get();
 
         assert(addr1 != addr3); // 应该是新对象
@@ -149,7 +160,9 @@ void test_pool_reuse_logic()
 void test_boundaries()
 {
     auto &manager = BatchManager::instance();
-    auto batch = manager.acquire(1, 1);
+    auto batch_res = manager.acquire(1, 1);
+    assert(batch_res.is_ok());
+    auto batch = batch_res.unwrap();
 
     // 1. 测试 Token 容量溢出
     try
@@ -205,7 +218,9 @@ void test_concurrency()
             // 随机申请不同大小，增加池管理的复杂性
             int size = (i % 2 == 0) ? 512 : 1024;
 
-            auto batch = manager.acquire(size);
+            auto batch_res = manager.acquire(size);
+            assert(batch_res.is_ok());
+            auto batch = batch_res.unwrap();
 
             // 简单操作
             batch->add(id, i, {0}, false);

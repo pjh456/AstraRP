@@ -14,8 +14,10 @@ namespace astra_rp
 
         BatchManager::~BatchManager() = default;
 
-        MulPtr<Batch> BatchManager::acquire(
-            int32_t required_tokens, int32_t required_seqs)
+        ResultV<MulPtr<Batch>>
+        BatchManager::acquire(
+            int32_t required_tokens,
+            int32_t required_seqs)
         {
             std::lock_guard<std::mutex> lock(m_mtx);
 
@@ -34,8 +36,9 @@ namespace astra_rp
                 m_pool.erase(it);
                 batch_ptr->clear();
 
-                return std::shared_ptr<Batch>(
-                    batch_ptr.release(), deleter);
+                return ResultV<MulPtr<Batch>>::Ok(
+                    std::shared_ptr<Batch>(
+                        batch_ptr.release(), deleter));
             }
 
             // 向上取整复用
@@ -46,8 +49,9 @@ namespace astra_rp
             auto *new_batch =
                 new Batch(alloc_size, required_seqs);
 
-            return std::shared_ptr<Batch>(
-                new_batch, deleter);
+            return ResultV<MulPtr<Batch>>::Ok(
+                std::shared_ptr<Batch>(
+                    new_batch, deleter));
         }
 
         void BatchManager::release(Batch *batch)
