@@ -112,7 +112,19 @@ namespace astra_rp
 
             return Tokenizer::tokenize(m_model, prompt)
                 .and_then([this](const Vec<Token> &tokens)
-                          { return feed_tokens(tokens); });
+                          { return feed_tokens(tokens); })
+                .map_err(
+                    [&](auto err)
+                    {
+                        ASTRA_LOG_ERROR("Failed to tokenize prompt: " + err.message());
+                        return utils::ErrorBuilder()
+                            .core()
+                            .tokenize_failed()
+                            .message("Failed to tokenize prompt")
+                            .context_id("SeqID_" + std::to_string(m_seq_id))
+                            .wrap(std::move(err))
+                            .build();
+                    });
         }
 
         ResultV<void> Session::feed_tokens(const Vec<Token> &tokens)
@@ -123,7 +135,22 @@ namespace astra_rp
 
             uint32_t max_batch_size = llama_n_batch(m_ctx->raw());
 
-            ASSIGN_OR_RETURN(batch, BatchManager::instance().acquire(tokens.size(), 1));
+            ASSIGN_OR_RETURN(
+                batch,
+                BatchManager::instance()
+                    .acquire(tokens.size(), 1)
+                    .map_err(
+                        [&](auto err)
+                        {
+                            ASTRA_LOG_ERROR("Failed to acquire batch for feeding tokens: " + err.message());
+                            return utils::ErrorBuilder()
+                                .core()
+                                .batch_capacity_exceeded()
+                                .message("Failed to acquire batch for feeding tokens. Required capacity: " + std::to_string(tokens.size()))
+                                .context_id("SeqID_" + std::to_string(m_seq_id))
+                                .wrap(std::move(err))
+                                .build();
+                        }));
 
             for (size_t i = 0; i < tokens.size(); i += max_batch_size)
             {
@@ -148,7 +175,12 @@ namespace astra_rp
                                 [](auto err)
                                 {
                                     ASTRA_LOG_ERROR("Failed to add token to batch: " + err.message());
-                                    return err;
+                                    return utils::ErrorBuilder()
+                                        .core()
+                                        .batch_capacity_exceeded()
+                                        .message("Failed to add token to batch")
+                                        .wrap(std::move(err))
+                                        .build();
                                 }));
 
                     m_n_past++;
@@ -166,6 +198,7 @@ namespace astra_rp
                                     .engine_decode_failed()
                                     .message("Engine decode failed during feed_tokens")
                                     .context_id("SeqID_" + std::to_string(m_seq_id))
+                                    .wrap(std::move(err))
                                     .build();
                             }));
             }
@@ -201,7 +234,12 @@ namespace astra_rp
                         [](auto err)
                         {
                             ASTRA_LOG_ERROR("Failed to add token to single batch: " + err.message());
-                            return err;
+                            return utils::ErrorBuilder()
+                                .core()
+                                .batch_capacity_exceeded()
+                                .message("Failed to add token to single batch")
+                                .wrap(std::move(err))
+                                .build();
                         }));
 
             TRY(Engine::instance()
@@ -215,6 +253,7 @@ namespace astra_rp
                                 .engine_decode_failed()
                                 .message("Engine decode failed during token generation")
                                 .context_id("SeqID_" + std::to_string(m_seq_id))
+                                .wrap(std::move(err))
                                 .build();
                         }));
 
@@ -241,10 +280,16 @@ namespace astra_rp
                     token,
                     generate_next()
                         .map_err(
-                            [](auto err)
+                            [&](auto err)
                             {
                                 ASTRA_LOG_ERROR("Failed to generate next token: " + err.message());
-                                return err;
+                                return utils::ErrorBuilder()
+                                    .infer()
+                                    .engine_decode_failed()
+                                    .message("Failed to generate next token")
+                                    .context_id("SeqID_" + std::to_string(m_seq_id))
+                                    .wrap(std::move(err))
+                                    .build();
                             }));
 
                 if (m_is_finished)
@@ -260,10 +305,16 @@ namespace astra_rp
                        false,
                        false)
                 .map_err(
-                    [](auto err)
+                    [&](auto err)
                     {
                         ASTRA_LOG_ERROR("Failed to detokenize generated tokens: " + err.message());
-                        return err;
+                        return utils::ErrorBuilder()
+                            .core()
+                            .detokenize_failed()
+                            .message("Failed to detokenize generated tokens")
+                            .context_id("SeqID_" + std::to_string(m_seq_id))
+                            .wrap(std::move(err))
+                            .build();
                     });
         }
     }
