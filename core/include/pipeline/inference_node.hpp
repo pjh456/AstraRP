@@ -57,10 +57,16 @@ namespace astra_rp
                         token,
                         m_session->generate_next()
                             .map_err(
-                                [](auto err)
+                                [&](auto err)
                                 {
                                     ASTRA_LOG_ERROR("Failed to generate next token: " + err.message());
-                                    return err;
+                                    return utils::ErrorBuilder()
+                                        .infer()
+                                        .engine_decode_failed()
+                                        .message("Failed to generate next token")
+                                        .context_id("SeqID_" + std::to_string(m_session->get_n_past()))
+                                        .wrap(std::move(err))
+                                        .build();
                                 }));
 
                     ASSIGN_OR_RETURN(
@@ -68,10 +74,16 @@ namespace astra_rp
                         astra_rp::core::Tokenizer::
                             detokenize(m_session->model(), {token})
                                 .map_err(
-                                    [](auto err)
+                                    [&](auto err)
                                     {
                                         ASTRA_LOG_ERROR("Failed to detokenize generated token: " + err.message());
-                                        return err;
+                                        return utils::ErrorBuilder()
+                                            .core()
+                                            .detokenize_failed()
+                                            .message("Failed to detokenize generated token")
+                                            .context_id("SeqID_" + std::to_string(m_session->get_n_past()))
+                                            .wrap(std::move(err))
+                                            .build();
                                     }));
 
                     full_text += token_str;
