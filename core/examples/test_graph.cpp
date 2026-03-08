@@ -39,7 +39,7 @@ void test_valid_acyclic_graph()
     graph.add_edge("B", "D");
     graph.add_edge("C", "D");
 
-    assert(graph.validate() == true);
+    assert(graph.validate().is_ok());
     ASTRA_LOG_INFO("Acyclic graph successfully validated.");
 }
 
@@ -59,7 +59,7 @@ void test_invalid_cyclic_graph()
     graph.add_edge("Y", "Z");
     graph.add_edge("Z", "X");
 
-    assert(graph.validate() == false);
+    assert(graph.validate().is_err());
     ASTRA_LOG_INFO("Cyclic graph (cycle detected) successfully rejected.");
 }
 
@@ -79,7 +79,7 @@ void test_disconnected_graph()
     graph.add_node(MulPtr<DummyNode>(new DummyNode("C")));
 
     // 只要没有环，不管有几个起点，都是合法的 DAG
-    assert(graph.validate() == true);
+    assert(graph.validate().is_ok());
     ASTRA_LOG_INFO("Disconnected graph successfully validated.");
 }
 

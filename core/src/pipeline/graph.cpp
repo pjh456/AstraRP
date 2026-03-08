@@ -17,10 +17,11 @@ namespace astra_rp
             m_in_degrees[to_id]++;
         }
 
-        bool Graph::validate() const
+        ResultV<void>
+        Graph::validate() const
         {
             if (m_nodes.empty())
-                return true;
+                return ResultV<void>::Ok();
 
             HashMap<Str, int> in_degrees_copy = m_in_degrees;
 
@@ -30,7 +31,12 @@ namespace astra_rp
                     zero_in_degree_queue.push(k);
 
             if (zero_in_degree_queue.empty())
-                return false;
+                return ResultV<void>::Err(
+                    utils::ErrorBuilder()
+                        .pipeline()
+                        .graph_cycle_detected()
+                        .message("Graph validation failed. No starting node with zero in-degree found, indicating a potential cycle or invalid topology.")
+                        .build());
 
             int processed_count = 0;
 
@@ -53,7 +59,14 @@ namespace astra_rp
                 }
             }
 
-            return processed_count == m_nodes.size();
+            if (processed_count != m_nodes.size())
+                return ResultV<void>::Err(
+                    utils::ErrorBuilder()
+                        .pipeline()
+                        .graph_cycle_detected()
+                        .message("Graph validation failed. A cyclic dependency or invalid topology was detected.")
+                        .build());
+            return ResultV<void>::Ok();
         }
     }
 }

@@ -25,7 +25,7 @@ namespace astra_rp
 
         void Scheduler::run()
         {
-            if (!m_graph->validate())
+            if (m_graph->validate().is_err())
                 throw std::runtime_error("Graph has cycles!");
 
             m_current_in_degrees = m_graph->in_degrees();

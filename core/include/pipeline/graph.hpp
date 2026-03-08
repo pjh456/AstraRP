@@ -25,7 +25,8 @@ namespace astra_rp
 
             void add_edge(const Str &from_id, const Str &to_id);
 
-            bool validate() const;
+            ResultV<void>
+            validate() const;
         };
     }
 }
