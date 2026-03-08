@@ -7,6 +7,7 @@
 
 #include "utils/types.hpp"
 #include "infer/session.hpp"
+#include "infer/generation_config.hpp"
 
 namespace astra_rp
 {
@@ -87,6 +88,9 @@ namespace astra_rp
             TaskBuilder &on_text_generated(std::function<bool(const Str &)> cb);
             TaskBuilder &on_finish(std::function<void()> cb);
             TaskBuilder &on_error(std::function<void(const utils::Error &)> cb);
+
+        public:
+            TaskBuilder &apply_config(const GenerationConfig &config);
         };
     }
 }

@@ -172,5 +172,13 @@ namespace astra_rp
             m_on_error = std::move(cb);
             return *this;
         }
+
+        TaskBuilder &TaskBuilder::apply_config(const GenerationConfig &config)
+        {
+            m_max_tokens = config.max_tokens;
+
+            // TODO: 把 config.grammar_rules 绑定到 task 上
+            return *this;
+        }
     }
 }

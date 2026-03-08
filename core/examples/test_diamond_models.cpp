@@ -10,6 +10,7 @@
 #include "pipeline/graph.hpp"
 #include "pipeline/inference_node.hpp"
 #include "pipeline/scheduler.hpp"
+#include "infer/generation_config.hpp"
 #include "utils/logger.hpp"
 
 using namespace astra_rp;
@@ -74,6 +75,8 @@ int main()
     auto n4 = std::make_shared<InferenceNode>("N4", nullptr, s4);
 
     // --- 核心：配置 Prompt 拼装逻辑 ---
+    infer::GenerationConfig conf;
+    conf.max_tokens = 60;
 
     // N1 独立起点
     n1->set_prompt_builder(
@@ -81,6 +84,7 @@ int main()
         {
             return "User: Name a random fruit. Just the name.\nAssistant:";
         });
+    n1->set_config(conf);
 
     // N2 接收 N1 的输出
     n2->set_prompt_builder(
@@ -89,6 +93,7 @@ int main()
             Str n1_fruit = inputs.at("N1").output; // 获取 N1 的结果
             return "User: What is the typical color of " + n1_fruit + "?\nAssistant:";
         });
+    n2->set_config(conf);
 
     // N3 接收 N1 的输出
     n3->set_prompt_builder(
@@ -97,6 +102,7 @@ int main()
             Str n1_fruit = inputs.at("N1").output;
             return "User: In which climate does " + n1_fruit + " grow?\nAssistant:";
         });
+    n3->set_config(conf);
 
     // N4 接收 N2 和 N3 的输出（菱形汇合！）
     n4->set_prompt_builder(
@@ -106,6 +112,7 @@ int main()
             Str climate = inputs.at("N3").output;
             return "User: Combine this info into one sentence.\nColor: " + color + "\nClimate: " + climate + "\nAssistant:";
         });
+    n4->set_config(conf);
 
     // 5. 编排拓扑边
     graph->add_node(n1);

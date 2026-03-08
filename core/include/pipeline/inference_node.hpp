@@ -8,6 +8,7 @@
 #include "core/tokenizer.hpp"
 #include "infer/task.hpp"
 #include "infer/engine.hpp"
+#include "infer/generation_config.hpp"
 #include "utils/logger.hpp"
 
 namespace astra_rp
@@ -20,6 +21,8 @@ namespace astra_rp
             MulPtr<astra_rp::infer::Session> m_session;
             MulPtr<astra_rp::core::LoRA> m_lora;
             float m_lora_scale;
+
+            infer::GenerationConfig m_config;
 
             // 在回调前灵活拼接 prompts
             std::function<Str(const HashMap<Str, NodePayload> &)> m_prompt_builder;
@@ -41,6 +44,11 @@ namespace astra_rp
 
             void set_prompt_builder(auto builder) { m_prompt_builder = builder; }
 
+            void set_config(const infer::GenerationConfig &config)
+            {
+                m_config = config;
+            }
+
         public:
             ResultV<void> execute() override
             {
@@ -58,7 +66,7 @@ namespace astra_rp
                     task,
                     infer::TaskBuilder(m_session)
                         .prompt(prompt)
-                        // .max_tokens(100) // 默认智能推导
+                        .apply_config(m_config)
                         .on_text_generated(
                             [this](const Str &text)
                             {
