@@ -69,11 +69,11 @@ set(GGML_OPENMP OFF CACHE BOOL "Enable OpenMP" FORCE)
 set(LLAMA_HTTPLIB OFF CACHE BOOL "Disable llama.cpp httplib" FORCE)
 set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
 
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
-set(LLAMA_SHARED OFF CACHE BOOL "Disable llama shared lib" FORCE)
-
+# set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
+# set(LLAMA_SHARED OFF CACHE BOOL "Disable llama shared lib" FORCE)
 set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama.cpp)
-set(BUILD_SHARED_LIBS OFF)
+
+# set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(${LLAMA_DIR})
 
 # 注入环境变量
@@ -116,11 +116,11 @@ target_link_libraries(astrarp_lib PUBLIC llama)
 add_executable(astra src/main.cpp)
 target_link_libraries(astra PRIVATE astrarp_lib)
 
-# add_custom_command(TARGET astra POST_BUILD
-# COMMAND ${CMAKE_COMMAND} -E copy_if_different
-# $<TARGET_FILE:llama>
-# $<TARGET_FILE_DIR:astra>
-# )
+add_custom_command(TARGET astra POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:llama>
+    $<TARGET_FILE_DIR:astra>
+)
 enable_testing()
 
 # 查找 examples 目录下所有的 cpp 文件
