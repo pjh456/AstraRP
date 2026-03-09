@@ -55,9 +55,11 @@ namespace astra_rp
             bool is_finished() const noexcept { return m_is_finished; }
             const Vec<Token> &history() const noexcept { return m_history_tokens; }
 
-            void advance_past(int32_t step) { m_n_past += step; }
+            void advance_past(int32_t step) noexcept { m_n_past += step; }
             void add_history(Token t) { m_history_tokens.push_back(t); }
-            void set_finished(bool flag) { m_is_finished = flag; }
+            void set_finished(bool flag) noexcept { m_is_finished = flag; }
+
+            void set_n_past(int32_t pos) noexcept { m_n_past = pos; }
 
         public:
             void clear();
