@@ -8,7 +8,7 @@ namespace astra_rp
 {
     namespace infer
     {
-        explicit ContextTransaction::ContextTransaction(
+        ContextTransaction::ContextTransaction(
             MulPtr<Session> session)
             : m_session(session),
               m_n_past_start(session->n_past()) {}
