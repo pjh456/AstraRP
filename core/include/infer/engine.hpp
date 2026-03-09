@@ -7,26 +7,25 @@
 #include <utility>
 
 #include "utils/types.hpp"
-#include "core/context.hpp"
-#include "core/batch.hpp"
-#include "infer/session.hpp"
+#include "core/sampler_chain.hpp"
 
 namespace astra_rp
 {
+    namespace core
+    {
+        class Batch;
+        class Context;
+    }
+
     namespace infer
     {
-        class Task;
+        class Session;
+    }
 
+    namespace infer
+    {
         class Engine
         {
-        private:
-            Queue<MulPtr<Task>> m_pending_queue;
-            std::mutex m_mtx;
-            std::condition_variable m_cv;
-
-            bool m_running = false;
-            std::thread m_worker;
-
         public:
             static Engine &instance();
 
@@ -34,7 +33,7 @@ namespace astra_rp
             Engine() = default;
 
         public:
-            ~Engine();
+            ~Engine() = default;
 
             Engine(const Engine &) = delete;
             Engine &operator=(const Engine &) = delete;
@@ -43,28 +42,37 @@ namespace astra_rp
             Engine &operator=(Engine &&) noexcept = default;
 
         public:
-            void start();
-            void stop();
-            void submit(MulPtr<Task> task);
+            ResultV<Token>
+            char2token(
+                MulPtr<core::Model> model,
+                char ch);
 
-        private:
-            void loop();
-
-            ResultV<void> decode(
-                MulPtr<astra_rp::core::Context> ctx,
-                MulPtr<astra_rp::core::Batch> batch);
+            ResultV<Vec<Token>>
+            str2token(
+                MulPtr<core::Model> model,
+                const Str &str);
 
             ResultV<std::pair<MulPtr<core::Batch>, size_t>>
             tok2batch(
-                MulPtr<infer::Session> session,
-                MulPtr<core::Context> ctx,
+                MulPtr<Session> session,
                 const Vec<Token> &tokens);
 
             ResultV<Vec<MulPtr<core::Batch>>>
             all_tok2batch(
-                MulPtr<infer::Session> session,
-                MulPtr<core::Context> ctx,
+                MulPtr<Session> session,
                 const Vec<Token> &tokens);
+
+            ResultV<void> decode(
+                MulPtr<Session> session,
+                MulPtr<core::Batch> batch);
+
+            ResultV<void> decode(
+                MulPtr<Session> session,
+                Vec<MulPtr<core::Batch>> batch);
+
+            ResultV<Token> sample(
+                MulPtr<core::Context> ctx,
+                const core::SamplerChain &sampler);
         };
     }
 }
