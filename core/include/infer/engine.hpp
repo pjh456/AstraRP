@@ -58,7 +58,13 @@ namespace astra_rp
             tok2batch(
                 MulPtr<infer::Session> session,
                 MulPtr<core::Context> ctx,
-                Vec<Token> tokens);
+                const Vec<Token> &tokens);
+
+            ResultV<Vec<MulPtr<core::Batch>>>
+            all_tok2batch(
+                MulPtr<infer::Session> session,
+                MulPtr<core::Context> ctx,
+                const Vec<Token> &tokens);
         };
     }
 }

@@ -236,7 +236,7 @@ namespace astra_rp
         Engine::tok2batch(
             MulPtr<infer::Session> session,
             MulPtr<core::Context> ctx,
-            Vec<Token> tokens)
+            const Vec<Token> &tokens)
         {
             using BatchRes = ResultV<std::pair<MulPtr<core::Batch>, size_t>>;
 
@@ -288,7 +288,7 @@ namespace astra_rp
                             {
                                 return utils::ErrorBuilder()
                                     .pipeline()
-                                    .batch_acquire_failed()
+                                    .batch_add_failed()
                                     .message("Batch add failed!")
                                     .wrap(std::move(err))
                                     .build();
@@ -298,7 +298,88 @@ namespace astra_rp
             }
 
             return BatchRes::Ok(
-                std::make_pair(std::move(batch), chunk_size));
+                std::make_pair(
+                    std::move(batch),
+                    chunk_size));
+        }
+
+        ResultV<Vec<MulPtr<core::Batch>>>
+        all_tok2batch(
+            MulPtr<infer::Session> session,
+            MulPtr<core::Context> ctx,
+            const Vec<Token> &tokens)
+        {
+            using BatchRes = ResultV<Vec<MulPtr<core::Batch>>>;
+
+            auto max_batch_size =
+                llama_n_batch(ctx->raw());
+            auto tok_size = tokens.size();
+            size_t chunk_size =
+                std::min(
+                    (size_t)max_batch_size,
+                    tok_size);
+
+            if (max_batch_size == 0)
+            {
+                return BatchRes::Err(
+                    utils::ErrorBuilder()
+                        .pipeline()
+                        .tokenize_failed()
+                        .message("No tokens to be processed or batch size == 0!")
+                        .build());
+            }
+
+            Vec<MulPtr<core::Batch>> batches;
+            batches.reserve(tok_size / chunk_size + 1);
+
+            for (size_t i = 0; i < tok_size; i += chunk_size)
+            {
+                ASSIGN_OR_RETURN(
+                    batch,
+                    core::BatchManager::instance()
+                        .acquire(chunk_size, 1)
+                        .map_err(
+                            [&](auto err)
+                            {
+                                batches.clear(); // 一个报错全部清空
+
+                                return utils::ErrorBuilder()
+                                    .pipeline()
+                                    .batch_acquire_failed()
+                                    .message("Batch acquire failed!")
+                                    .wrap(std::move(err))
+                                    .build();
+                            }));
+
+                for (size_t j = 0; j < chunk_size; ++j)
+                {
+                    auto idx = i + j;
+                    bool require_logits = (idx == tok_size - 1);
+                    auto &tok = tokens[idx];
+
+                    TRY(batch->add(
+                                 tok,
+                                 session->n_past(),
+                                 {session->seq_id()},
+                                 require_logits)
+                            .map_err(
+                                [](auto err)
+                                {
+                                    return utils::ErrorBuilder()
+                                        .pipeline()
+                                        .batch_add_failed()
+                                        .message("Batch add failed!")
+                                        .wrap(std::move(err))
+                                        .build();
+                                }));
+                    session->advance_past(1);
+                    session->add_history(tok);
+                }
+
+                batches.push_back(std::move(batch));
+            }
+
+            return BatchRes::Ok(std::move(batches));
         }
     }
 }
