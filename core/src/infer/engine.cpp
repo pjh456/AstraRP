@@ -101,60 +101,16 @@ namespace astra_rp
                 auto ctx = session->context();
 
                 // 3. 动态确定本次 Batch 大小 (由 Context 配置和剩余 Token 数共同决定)
-                uint32_t n_batch_max = llama_n_batch(ctx->raw());
-                size_t tokens_to_process = std::min((size_t)n_batch_max, task->pending_tokens.size());
+                auto batches_res =
+                    tok2batch(
+                        session,
+                        ctx,
+                        task->pending_tokens);
 
-                if (tokens_to_process == 0)
-                {
-                    // 没有需要处理的 Token，可能状态异常，直接结束
-                    task->m_state = TaskState::FINISHED;
-                    if (task->on_finish)
-                        task->on_finish();
-                    task->completion_signal.set_value();
-                    continue;
-                }
-
-                // 4. 从你的 BatchManager 借用对应大小的 Batch
-                auto batch_res = core::BatchManager::instance().acquire(tokens_to_process, 1);
-                if (batch_res.is_err())
-                {
-                    task->m_state = TaskState::FAILED;
-                    if (task->on_error)
-                        task->on_error(batch_res.unwrap_err());
-                    task->completion_signal.set_value(); // 解除阻塞
-                    continue;
-                }
-                auto batch = batch_res.unwrap();
-
-                // 5. 组装物理 Batch 数据
-                bool add_failed = false;
-                for (size_t i = 0; i < tokens_to_process; ++i)
-                {
-                    // 只有这批 pending_tokens 的*最后一个*才需要计算 Logits 用于下一次采样
-                    bool is_absolute_last =
-                        (i == tokens_to_process - 1) &&
-                        (tokens_to_process == task->pending_tokens.size());
-
-                    auto add_res = batch->add(
-                        task->pending_tokens[i],
-                        session->n_past() + i,
-                        {session->seq_id()},
-                        is_absolute_last);
-
-                    if (add_res.is_err())
-                    {
-                        task->m_state = TaskState::FAILED;
-                        task->fail_reason = add_res.unwrap_err();
-                        if (task->on_error)
-                            task->on_error(add_res.unwrap_err());
-                        task->completion_signal.set_value();
-                        add_failed = true;
-                        break;
-                    }
-                }
-
-                if (add_failed)
+                if (batches_res.is_err())
                     continue; // 放弃此任务
+
+                auto [batch, tokens_to_process] = batches_res.unwrap();
 
                 // 6. 核心动作：执行单次物理推理
                 auto dec_res = decode(ctx, batch);
@@ -167,9 +123,6 @@ namespace astra_rp
                     task->completion_signal.set_value();
                     continue;
                 }
-
-                // 推进 Session 的时间线
-                session->advance_past(tokens_to_process);
 
                 // 从 pending 队列中抹除已经处理完的 tokens
                 task->pending_tokens.erase(
@@ -277,6 +230,75 @@ namespace astra_rp
                 }
             }
             return ResultV<void>::Ok();
+        }
+
+        ResultV<std::pair<MulPtr<core::Batch>, size_t>>
+        Engine::tok2batch(
+            MulPtr<infer::Session> session,
+            MulPtr<core::Context> ctx,
+            Vec<Token> tokens)
+        {
+            using BatchRes = ResultV<std::pair<MulPtr<core::Batch>, size_t>>;
+
+            auto max_batch_size =
+                llama_n_batch(ctx->raw());
+            auto tok_size = tokens.size();
+            size_t chunk_size =
+                std::min(
+                    (size_t)max_batch_size,
+                    tok_size);
+
+            if (max_batch_size == 0)
+            {
+                return BatchRes::Err(
+                    utils::ErrorBuilder()
+                        .pipeline()
+                        .tokenize_failed()
+                        .message("No tokens to be processed or batch size == 0!")
+                        .build());
+            }
+
+            ASSIGN_OR_RETURN(
+                batch,
+                core::BatchManager::instance()
+                    .acquire(chunk_size)
+                    .map_err(
+                        [](auto err)
+                        {
+                            return utils::ErrorBuilder()
+                                .pipeline()
+                                .batch_acquire_failed()
+                                .message("Batch acquire failed!")
+                                .wrap(std::move(err))
+                                .build();
+                        }));
+
+            for (size_t i = 0; i < chunk_size; ++i)
+            {
+                bool require_logits = (i == tok_size - 1);
+                auto &tok = tokens[i];
+
+                TRY(batch->add(
+                             tok,
+                             session->n_past(),
+                             {session->seq_id()},
+                             require_logits)
+                        .map_err(
+                            [](auto err)
+                            {
+                                return utils::ErrorBuilder()
+                                    .pipeline()
+                                    .batch_acquire_failed()
+                                    .message("Batch add failed!")
+                                    .wrap(std::move(err))
+                                    .build();
+                            }));
+                session->advance_past(1);
+                session->add_history(tok);
+            }
+
+            return BatchRes::Ok(
+                std::make_pair(std::move(batch), chunk_size));
         }
     }
 }

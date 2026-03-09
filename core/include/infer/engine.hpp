@@ -4,10 +4,12 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <utility>
 
 #include "utils/types.hpp"
 #include "core/context.hpp"
 #include "core/batch.hpp"
+#include "infer/session.hpp"
 
 namespace astra_rp
 {
@@ -51,6 +53,12 @@ namespace astra_rp
             ResultV<void> decode(
                 MulPtr<astra_rp::core::Context> ctx,
                 MulPtr<astra_rp::core::Batch> batch);
+
+            ResultV<std::pair<MulPtr<core::Batch>, size_t>>
+            tok2batch(
+                MulPtr<infer::Session> session,
+                MulPtr<core::Context> ctx,
+                Vec<Token> tokens);
         };
     }
 }

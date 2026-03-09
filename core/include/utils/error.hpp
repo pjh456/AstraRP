@@ -51,6 +51,8 @@ namespace astra_rp
             LoRALoadFailed,
             ContextInitFailed,
             BatchCapacityExceeded,
+            BatchAcquireFailed,
+            BatchAddFailed,
             TokenizeFailed,
             DetokenizeFailed,
 
@@ -154,6 +156,8 @@ namespace astra_rp
             ErrorBuilder &lora_load_failed() noexcept { return code(ErrorCode::LoRALoadFailed); }
             ErrorBuilder &context_init_failed() noexcept { return code(ErrorCode::ContextInitFailed); }
             ErrorBuilder &batch_capacity_exceeded() noexcept { return code(ErrorCode::BatchCapacityExceeded); }
+            ErrorBuilder &batch_acquire_failed() noexcept { return code(ErrorCode::BatchAcquireFailed); }
+            ErrorBuilder &batch_add_failed() noexcept { return code(ErrorCode::BatchAddFailed); }
             ErrorBuilder &tokenize_failed() noexcept { return code(ErrorCode::TokenizeFailed); }
             ErrorBuilder &detokenize_failed() noexcept { return code(ErrorCode::DetokenizeFailed); }
 
