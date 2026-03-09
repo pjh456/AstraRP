@@ -76,7 +76,7 @@ namespace astra_rp
         public:
             void push_back(UniSampler sampler, const Str &name);
 
-            Token sample(const Context &ctx, int32_t idx);
+            Token sample(MulPtr<Context> ctx, int32_t idx) const;
 
         private:
             void free_resource();

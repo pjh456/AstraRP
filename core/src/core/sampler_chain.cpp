@@ -137,10 +137,13 @@ namespace astra_rp
         }
 
         Token SamplerChain::sample(
-            const Context &ctx,
-            int32_t idx)
+            MulPtr<Context> ctx,
+            int32_t idx) const
         {
-            return llama_sampler_sample(m_chain, ctx.raw(), idx);
+            return llama_sampler_sample(
+                m_chain,
+                ctx->raw(),
+                idx);
         }
 
         void SamplerChain::free_resource()
