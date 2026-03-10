@@ -10,6 +10,7 @@
 #include "infer/engine.hpp"
 #include "pipeline/graph.hpp"
 #include "pipeline/inference_node.hpp"
+#include "pipeline/format_node.hpp"
 #include "pipeline/scheduler.hpp"
 #include "infer/generation_config.hpp"
 #include "utils/logger.hpp"
@@ -68,37 +69,61 @@ int main()
     auto n2 = std::make_shared<InferenceNode>("N2", nullptr, s2);
     auto n3 = std::make_shared<InferenceNode>("N3", nullptr, s3);
     auto n4 = std::make_shared<InferenceNode>("N4", nullptr, s4);
+    auto fn = std::make_shared<FormatNode>(
+        "FN", nullptr,
+        [](const auto &inputs)
+        {
+            Str color = inputs.at("N2").output;
+            Str climate = inputs.at("N3").output;
+            return "Color: " + color + "\nClimate: " + climate;
+        });
 
     infer::GenerationConfig conf;
     conf.max_tokens = 60;
 
-    n1->set_prompt_builder([](const auto &inputs)
-                           { return "User: Name a random fruit. Just the name.\nAssistant:"; });
+    n1->set_prompt_builder(
+        [](const auto &inputs)
+        { return "User: Name a random fruit. Just the name.\nAssistant:"; });
     n1->set_config(conf);
 
-    n2->set_prompt_builder([](const auto &inputs)
-                           { return "User: What is the typical color of " + inputs.at("N1").output + "?\nAssistant:"; });
+    n2->set_prompt_builder(
+        [](const auto &inputs)
+        {
+            return "User: What is the typical color of " +
+                   inputs.at("N1").output +
+                   "?\nAssistant:";
+        });
     n2->set_config(conf);
 
-    n3->set_prompt_builder([](const auto &inputs)
-                           { return "User: In which climate does " + inputs.at("N1").output + " grow?\nAssistant:"; });
+    n3->set_prompt_builder(
+        [](const auto &inputs)
+        {
+            return "User: In which climate does " +
+                   inputs.at("N1").output +
+                   " grow?\nAssistant:";
+        });
     n3->set_config(conf);
 
-    n4->set_prompt_builder([](const auto &inputs)
-                           { return "User: Combine this info into one sentence.\nColor: " +
-                                    inputs.at("N2").output + "\nClimate: " +
-                                    inputs.at("N3").output + "\nAssistant:"; });
+    n4->set_prompt_builder(
+        [](const auto &inputs)
+        {
+            return "User: Combine this info into one sentence.\n" +
+                   inputs.at("FN").output +
+                   "\nAssistant:";
+        });
     n4->set_config(conf);
 
     graph->add_node(n1);
     graph->add_node(n2);
     graph->add_node(n3);
     graph->add_node(n4);
+    graph->add_node(fn);
 
     graph->add_edge("N1", "N2");
     graph->add_edge("N1", "N3");
-    graph->add_edge("N2", "N4");
-    graph->add_edge("N3", "N4");
+    graph->add_edge("N2", "FN");
+    graph->add_edge("N3", "FN");
+    graph->add_edge("FN", "N4");
 
     // Scheduler执行
     Scheduler scheduler(graph, 4);
