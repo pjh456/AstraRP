@@ -51,16 +51,10 @@ namespace astra_rp
             GlobalConfigManager &operator=(GlobalConfigManager &&) noexcept = default;
 
         public:
-            GlobalConfigData current() noexcept
+            GlobalConfigData &current() noexcept
             {
                 std::lock_guard<std::mutex> lock(m_mtx);
                 return m_data;
-            }
-
-            void update(const GlobalConfigData &data)
-            {
-                std::lock_guard<std::mutex> lock(m_mtx);
-                m_data = data;
             }
 
             bool loaded() noexcept
