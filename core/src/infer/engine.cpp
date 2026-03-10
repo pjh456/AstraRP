@@ -24,11 +24,13 @@ namespace astra_rp
         ResultV<Token>
         Engine::char2token(
             MulPtr<core::Model> model,
-            char ch)
+            char ch,
+            TokenizeParams params)
         {
             return str2token(
                        model,
-                       Str(1, ch))
+                       Str(1, ch),
+                       params)
                 .map([](auto vec)
                      { return vec[0]; });
         }
@@ -36,7 +38,8 @@ namespace astra_rp
         ResultV<Vec<Token>>
         Engine::str2token(
             MulPtr<core::Model> model,
-            const Str &str)
+            const Str &str,
+            TokenizeParams params)
         {
             using TokenRes = ResultV<Vec<Token>>;
 
@@ -47,7 +50,11 @@ namespace astra_rp
 
             ASSIGN_OR_RETURN(
                 tokens,
-                core::Tokenizer::tokenize(model, str)
+                core::Tokenizer::tokenize(
+                    model,
+                    str,
+                    params.add_special,
+                    params.parse_special)
                     .map_err(
                         [&model](auto err)
                         {

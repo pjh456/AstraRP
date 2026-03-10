@@ -20,10 +20,13 @@ namespace astra_rp
     namespace infer
     {
         class Session;
-    }
 
-    namespace infer
-    {
+        struct TokenizeParams
+        {
+            bool add_special = true;
+            bool parse_special = true;
+        };
+
         class Engine
         {
         public:
@@ -45,12 +48,14 @@ namespace astra_rp
             ResultV<Token>
             char2token(
                 MulPtr<core::Model> model,
-                char ch);
+                char ch,
+                TokenizeParams params = {});
 
             ResultV<Vec<Token>>
             str2token(
                 MulPtr<core::Model> model,
-                const Str &str);
+                const Str &str,
+                TokenizeParams params = {});
 
             ResultV<std::pair<MulPtr<core::Batch>, size_t>>
             tok2batch(
