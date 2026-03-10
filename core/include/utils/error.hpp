@@ -47,6 +47,7 @@ namespace astra_rp
         enum class ErrorCode
         {
             // --- Core Errors ---
+            ConfigLoadFailed,
             ModelLoadFailed,
             LoRALoadFailed,
             ContextInitFailed,
@@ -152,6 +153,7 @@ namespace astra_rp
             }
 
             // --- Core Errors ---
+            ErrorBuilder &config_load_failed() noexcept { return code(ErrorCode::ConfigLoadFailed); }
             ErrorBuilder &model_load_failed() noexcept { return code(ErrorCode::ModelLoadFailed); }
             ErrorBuilder &lora_load_failed() noexcept { return code(ErrorCode::LoRALoadFailed); }
             ErrorBuilder &context_init_failed() noexcept { return code(ErrorCode::ContextInitFailed); }

@@ -1,5 +1,7 @@
 #include "core/context_manager.hpp"
 
+#include "core/global_config.hpp"
+
 namespace astra_rp
 {
     namespace core
@@ -18,7 +20,25 @@ namespace astra_rp
             MulPtr<Model> model,
             ContextParams params)
         {
+            using CtxRes = ResultV<MulPtr<Context>>;
+
             std::lock_guard<std::mutex> lock(m_mtx);
+
+            auto conf =
+                GlobalConfigManager::instance()
+                    .current();
+
+            if (GlobalConfigManager::instance().loaded() &&
+                params.metadata().context_size >
+                    conf.context_params.metadata().context_size)
+            {
+                return CtxRes::Err(
+                    utils::ErrorBuilder()
+                        .system()
+                        .out_of_memory()
+                        .message("Requested context size exceeds global limits!")
+                        .build());
+            }
 
             auto name = model->name();
             auto &pool_list = m_pool[name];
@@ -38,14 +58,14 @@ namespace astra_rp
 
                 ctx_ptr->clear(true);
 
-                return ResultV<MulPtr<Context>>::Ok(
+                return CtxRes::Ok(
                     MulPtr<Context>(
                         ctx_ptr.release(), deleter));
             }
 
             auto raw_ctx = llama_init_from_model(model->raw(), params.raw());
             if (!raw_ctx)
-                return ResultV<MulPtr<Context>>::Err(
+                return CtxRes::Err(
                     utils::ErrorBuilder()
                         .core()
                         .context_init_failed()
@@ -55,7 +75,7 @@ namespace astra_rp
 
             auto *new_ctx = new Context(model, raw_ctx);
 
-            return ResultV<MulPtr<Context>>::Ok(
+            return CtxRes::Ok(
                 MulPtr<Context>(
                     new_ctx, deleter));
         }

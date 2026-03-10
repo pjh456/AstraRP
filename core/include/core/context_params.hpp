@@ -9,6 +9,17 @@ namespace astra_rp
     {
         class ContextManager;
         class ContextParamsBuilder;
+        class ContextParamsMetaData;
+
+        struct ContextParamsMetaData
+        {
+            uint32_t context_size = 512;
+            uint32_t batch_size = 2048;
+            uint32_t max_seqs = 1;
+            uint32_t threads = GGML_DEFAULT_N_THREADS;
+            uint32_t threads_batch = GGML_DEFAULT_N_THREADS;
+            bool flash_attention = false;
+        };
 
         class ContextParams
         {
@@ -17,6 +28,8 @@ namespace astra_rp
 
         private:
             llama_context_params m_params;
+
+            ContextParamsMetaData m_metadata;
 
         public:
             ContextParams(llama_context_params params)
@@ -38,6 +51,7 @@ namespace astra_rp
 
         public:
             llama_context_params raw() const noexcept { return m_params; }
+            ContextParamsMetaData metadata() const noexcept { return m_metadata; }
         };
 
         class ContextParamsBuilder

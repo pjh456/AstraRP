@@ -2,6 +2,7 @@
 
 #include "llama.h"
 
+#include "core/global_config.hpp"
 #include "utils/logger.hpp"
 
 namespace astra_rp
@@ -144,5 +145,27 @@ namespace astra_rp
                 name +
                 "] unregistered from manager.");
         }
+
+        ResultV<MulPtr<Model>>
+        ModelManager::load_config_model(
+            ModelParams params)
+        {
+            auto path =
+                GlobalConfigManager::instance()
+                    .current()
+                    .model_dir;
+            if (!GlobalConfigManager::instance().loaded())
+            {
+                return ResultV<MulPtr<Model>>::Err(
+                    utils::ErrorBuilder()
+                        .core()
+                        .config_load_failed()
+                        .message("config file has not loaded yet.")
+                        .build());
+            }
+
+            return load(path, params);
+        }
     }
+
 }

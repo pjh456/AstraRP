@@ -38,6 +38,9 @@ namespace astra_rp
         public:
             ResultV<MulPtr<Model>> load(const Str &path, ModelParams params);
             void unload(const Str &name);
+
+        public:
+            ResultV<MulPtr<Model>> load_config_model(ModelParams params);
         };
     }
 }
