@@ -4,3 +4,6 @@
 [submodule "dataset_factory/chatbot_dataset_tools"]
 	path = dataset_factory/chatbot_dataset_tools
 	url = https://github.com/pjh456/chatbot_dataset_tools
+[submodule "core/pjh_json"]
+	path = core/pjh_json
+	url = https://github.com/pjh456/Let_us_build_cpp_json_parser

@@ -60,6 +60,8 @@ set(GGML_OPENMP OFF CACHE BOOL "Enable OpenMP" FORCE)
 set(LLAMA_HTTPLIB OFF CACHE BOOL "Disable llama.cpp httplib" FORCE)
 set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
 
+set(HAVE_STD_REGEX 1) # make benchmark happy
+
 # set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
 # set(LLAMA_SHARED OFF CACHE BOOL "Disable llama shared lib" FORCE)
 set(LLAMA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
@@ -95,14 +97,17 @@ file(GLOB_RECURSE ASTRARP_SOURCES
     src/*.cpp
 )
 
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/pjh_json")
+
 # 创建一个静态库，方便 examples 链接
 add_library(astrarp_lib STATIC ${ASTRARP_SOURCES} ${ASTRARP_HEADERS})
 
 target_include_directories(astrarp_lib PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include")
+    "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pjh_json/include")
 
-target_link_libraries(astrarp_lib PUBLIC llama)
+target_link_libraries(astrarp_lib PUBLIC llama pjh_json benchmark::benchmark)
 
 add_executable(astra src/main.cpp)
 target_link_libraries(astra PRIVATE astrarp_lib)
