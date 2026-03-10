@@ -1,0 +1,24 @@
+{
+  "name": "astrarp",
+  "version": "1.0.0",
+  "description": "**AstraRP** 是一个基于 **[llama.cpp](https://github.com/ggml-org/llama.cpp.git)** 的，专为深度角色扮演（Role-Play）设计的下一代智能体架构。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pjh456/AstraRP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/pjh456/AstraRP/issues"
+  },
+  "homepage": "https://github.com/pjh456/AstraRP#readme",
+  "dependencies": {
+    "cmake-js": "^8.0.0",
+    "node-addon-api": "^8.6.0"
+  }
+}

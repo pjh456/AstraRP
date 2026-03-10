@@ -2,3 +2,5 @@
 models/
 build/
 .env
+node_modules/
+package-lock.json

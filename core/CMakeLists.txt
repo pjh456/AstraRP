@@ -5,22 +5,13 @@ project(AstraRP_core VERSION 0.1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 如果没指定构建类型，强制默认为 RelWithDebInfo
-# RelWithDebInfo 既有 -O2 优化 (快)，又有 debug symbol (能调试)。
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    message(STATUS "No build type selected, defaulting to RelWithDebInfo for speed.")
-    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
-endif()
-
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    set(IS_ARM TRUE)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86" OR CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64")
-    set(IS_X86 TRUE)
-endif()
-
 # 2. CPU 指令集优化：开启高度优化并启用原生指令集 (AVX2/AVX512等)
 if(MSVC)
-    add_compile_options(/utf-8 /MP) # /MP 开启多核编译
+    add_compile_options(
+        /utf-8
+        /MP # /MP 开启多核编译
+        /Zc:char8_t-
+    )
 
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
@@ -71,7 +62,7 @@ set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
 
 # set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
 # set(LLAMA_SHARED OFF CACHE BOOL "Disable llama shared lib" FORCE)
-set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama.cpp)
+set(LLAMA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
 
 # set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(${LLAMA_DIR})
@@ -152,3 +143,30 @@ foreach(SOURCE_FILE ${EXAMPLE_SOURCES})
 
     # endif()
 endforeach()
+
+# 获取 node-addon-api include
+execute_process(
+    COMMAND node -p "require('node-addon-api').include"
+    OUTPUT_VARIABLE NODE_ADDON_API_DIR
+)
+
+string(REPLACE "\n" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
+
+include_directories(${NODE_ADDON_API_DIR})
+
+add_definitions(-DNAPI_VERSION=8)
+add_definitions(-DNAPI_CPP_EXCEPTIONS)
+
+# 编译 node addon
+add_library(astarp_node MODULE src/main.cpp)
+
+# Node 模块必须没有前缀
+set_target_properties(astarp_node PROPERTIES
+    PREFIX ""
+    SUFFIX ".node"
+)
+
+target_link_libraries(astarp_node
+    PRIVATE
+    astrarp_lib
+)
