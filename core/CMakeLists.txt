@@ -4,6 +4,7 @@ project(AstraRP_core VERSION 0.1.0)
 # 1. 设置 C++ 标准 (llama.cpp 要求至少 C++11，建议使用 17 或更高)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # 2. CPU 指令集优化：开启高度优化并启用原生指令集 (AVX2/AVX512等)
 if(MSVC)
@@ -84,8 +85,6 @@ foreach(line IN LISTS ENV_LINES)
     list(APPEND ENV_LIST "${line}")
 endforeach()
 
-# message(STATUS "Filtered envs: ${ENV_LIST}")
-
 # 4. 添加可执行程序
 file(GLOB_RECURSE ASTRARP_HEADERS
     include/*.h
@@ -148,30 +147,3 @@ foreach(SOURCE_FILE ${EXAMPLE_SOURCES})
 
     # endif()
 endforeach()
-
-# 获取 node-addon-api include
-execute_process(
-    COMMAND node -p "require('node-addon-api').include"
-    OUTPUT_VARIABLE NODE_ADDON_API_DIR
-)
-
-string(REPLACE "\n" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
-
-include_directories(${NODE_ADDON_API_DIR})
-
-add_definitions(-DNAPI_VERSION=8)
-add_definitions(-DNAPI_CPP_EXCEPTIONS)
-
-# 编译 node addon
-add_library(astarp_node MODULE src/main.cpp)
-
-# Node 模块必须没有前缀
-set_target_properties(astarp_node PROPERTIES
-    PREFIX ""
-    SUFFIX ".node"
-)
-
-target_link_libraries(astarp_node
-    PRIVATE
-    astrarp_lib
-)
