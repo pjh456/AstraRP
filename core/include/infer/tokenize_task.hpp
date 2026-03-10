@@ -3,6 +3,7 @@
 
 #include "utils/types.hpp"
 #include "infer/i_task.hpp"
+#include "infer/params.hpp"
 
 namespace astra_rp
 {
@@ -17,12 +18,19 @@ namespace astra_rp
         {
         private:
             MulPtr<core::Model> m_model;
+            TokenizeParams m_params;
+
             Str m_prompt;
             Vec<Token> m_tokens;
 
         public:
-            TokenizeTask(MulPtr<core::Model> model, Str prompt)
-                : m_model(model), m_prompt(std::move(prompt)) {}
+            TokenizeTask(
+                MulPtr<core::Model> model,
+                Str prompt,
+                TokenizeParams params = {})
+                : m_model(model),
+                  m_prompt(std::move(prompt)),
+                  m_params(params) {}
 
         public:
             Str name() const noexcept override { return "TokenizeTask"; }

@@ -73,14 +73,19 @@ namespace astra_rp
         ResultV<std::pair<MulPtr<core::Batch>, size_t>>
         Engine::tok2batch(
             MulPtr<infer::Session> session,
-            const Vec<Token> &tokens)
+            const Vec<Token> &tokens,
+            int32_t max_tokens)
         {
             using BatchRes = ResultV<std::pair<MulPtr<core::Batch>, size_t>>;
 
             auto ctx = session->context();
 
             auto max_batch_size =
-                llama_n_batch(ctx->raw());
+                max_tokens < 0
+                    ? llama_n_batch(ctx->raw())
+                    : std::min(
+                          max_tokens,
+                          (int32_t)llama_n_batch(ctx->raw()));
             auto tok_size = tokens.size();
             size_t chunk_size =
                 std::min(
@@ -145,7 +150,8 @@ namespace astra_rp
         ResultV<Vec<MulPtr<core::Batch>>>
         Engine::all_tok2batch(
             MulPtr<infer::Session> session,
-            const Vec<Token> &tokens)
+            const Vec<Token> &tokens,
+            int32_t max_tokens)
         {
             using BatchRes = ResultV<Vec<MulPtr<core::Batch>>>;
 
@@ -154,7 +160,11 @@ namespace astra_rp
             auto ctx = session->context();
 
             auto max_batch_size =
-                llama_n_batch(ctx->raw());
+                max_tokens < 0
+                    ? llama_n_batch(ctx->raw())
+                    : std::min(
+                          max_tokens,
+                          (int32_t)llama_n_batch(ctx->raw()));
             auto tok_size = tokens.size();
             size_t chunk_size =
                 std::min(

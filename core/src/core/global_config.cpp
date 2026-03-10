@@ -75,6 +75,9 @@ namespace astra_rp
                 m_data.context_params = builder.build();
             }
 
+            m_data.max_concurrency =
+                json["max_concurrency"].as_int();
+
             delete json.get();
 
             m_loaded = true;
@@ -99,10 +102,10 @@ namespace astra_rp
             }
 
             file << "{";
-            file << "model_dir:" << m_data.model_dir << ",";
+            file << "\"model_dir\":" << m_data.model_dir << ",";
             {
                 auto meta = m_data.model_params.metadata();
-                file << "model_params:{";
+                file << "\"model_params\":{";
                 EASY_SERIALIZE_INT(gpu_layers);
                 EASY_SERIALIZE_BOOL(use_mlock);
                 EASY_SERIALIZE_BOOL_END(use_mmap);
@@ -111,7 +114,7 @@ namespace astra_rp
 
             {
                 auto meta = m_data.context_params.metadata();
-                file << "context_params:{";
+                file << "\"context_params\":{";
                 EASY_SERIALIZE_INT(context_size);
                 EASY_SERIALIZE_INT(batch_size);
                 EASY_SERIALIZE_INT(max_seqs);
@@ -121,7 +124,7 @@ namespace astra_rp
                 file << "},";
             }
 
-            file << "max_concurrency:" << m_data.max_concurrency;
+            file << "\"max_concurrency\":" << m_data.max_concurrency;
             file << "}";
 
             file.close();

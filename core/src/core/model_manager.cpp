@@ -147,13 +147,8 @@ namespace astra_rp
         }
 
         ResultV<MulPtr<Model>>
-        ModelManager::load_config_model(
-            ModelParams params)
+        ModelManager::load_config_model()
         {
-            auto path =
-                GlobalConfigManager::instance()
-                    .current()
-                    .model_dir;
             if (!GlobalConfigManager::instance().loaded())
             {
                 return ResultV<MulPtr<Model>>::Err(
@@ -164,7 +159,13 @@ namespace astra_rp
                         .build());
             }
 
-            return load(path, params);
+            const auto &conf =
+                GlobalConfigManager::instance()
+                    .current();
+
+            return load(
+                conf.model_dir,
+                std::move(conf.model_params));
         }
     }
 

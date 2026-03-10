@@ -8,6 +8,7 @@
 
 #include "utils/types.hpp"
 #include "core/sampler_chain.hpp"
+#include "infer/params.hpp"
 
 namespace astra_rp
 {
@@ -20,12 +21,6 @@ namespace astra_rp
     namespace infer
     {
         class Session;
-
-        struct TokenizeParams
-        {
-            bool add_special = true;
-            bool parse_special = true;
-        };
 
         class Engine
         {
@@ -60,12 +55,14 @@ namespace astra_rp
             ResultV<std::pair<MulPtr<core::Batch>, size_t>>
             tok2batch(
                 MulPtr<Session> session,
-                const Vec<Token> &tokens);
+                const Vec<Token> &tokens,
+                int32_t max_tokens = -1);
 
             ResultV<Vec<MulPtr<core::Batch>>>
             all_tok2batch(
                 MulPtr<Session> session,
-                const Vec<Token> &tokens);
+                const Vec<Token> &tokens,
+                int32_t max_tokens = -1);
 
             ResultV<void> decode(
                 MulPtr<Session> session,

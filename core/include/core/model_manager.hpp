@@ -40,7 +40,7 @@ namespace astra_rp
             void unload(const Str &name);
 
         public:
-            ResultV<MulPtr<Model>> load_config_model(ModelParams params);
+            ResultV<MulPtr<Model>> load_config_model();
         };
     }
 }

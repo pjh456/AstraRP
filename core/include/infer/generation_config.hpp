@@ -9,8 +9,10 @@ namespace astra_rp
     {
         struct GenerationConfig
         {
+            bool add_special = true;
+            bool parse_special = true;
+
             int32_t max_tokens = -1;
-            Str grammar_rules = "";
         };
     }
 }

@@ -15,7 +15,8 @@ namespace astra_rp
                 Engine::instance()
                     .all_tok2batch(
                         m_session,
-                        m_tokens));
+                        m_tokens,
+                        m_params.max_tokens));
 
             TRY(Engine::instance()
                     .decode(

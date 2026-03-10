@@ -2,6 +2,7 @@
 #define INCLUDE_ASTRA_RP_INFERENCE_NODE_HPP
 
 #include "utils/types.hpp"
+#include "core/global_config.hpp"
 #include "pipeline/base_node.hpp"
 #include "infer/session.hpp"
 #include "core/lora.hpp"
@@ -11,6 +12,7 @@
 #include "infer/decode_task.hpp"
 #include "infer/sample_task.hpp"
 #include "infer/generation_config.hpp"
+#include "infer/params.hpp"
 #include "utils/logger.hpp"
 
 namespace astra_rp
@@ -20,8 +22,8 @@ namespace astra_rp
         class InferenceNode : public BaseNode
         {
         private:
-            MulPtr<astra_rp::infer::Session> m_session;
-            MulPtr<astra_rp::core::LoRA> m_lora;
+            MulPtr<infer::Session> m_session;
+            MulPtr<core::LoRA> m_lora;
             float m_lora_scale;
 
             infer::GenerationConfig m_config;
@@ -33,11 +35,11 @@ namespace astra_rp
             InferenceNode(
                 const Str &id,
                 MulPtr<EventBus> bus,
-                MulPtr<astra_rp::infer::Session> session)
+                MulPtr<infer::Session> session)
                 : BaseNode(id, bus), m_session(session) {}
 
             void set_lora(
-                MulPtr<astra_rp::core::LoRA> lora,
+                MulPtr<core::LoRA> lora,
                 float scale = 1.0f)
             {
                 m_lora = lora;
@@ -49,6 +51,86 @@ namespace astra_rp
             void set_config(const infer::GenerationConfig &config)
             {
                 m_config = config;
+            }
+
+        public:
+            static ResultV<InferenceNode>
+            create(
+                const Str &id,
+                MulPtr<core::Model> model,
+                core::ContextParams cp,
+                infer::TokenizeParams tp,
+                infer::DecodeParams dp,
+                infer::SampleParams sp,
+                MulPtr<EventBus> bus = nullptr)
+            {
+                auto builder =
+                    core::SamplerChainBuilder();
+                if (!sp.grammar.empty())
+                    builder.grammar(
+                        model,
+                        sp.grammar,
+                        "");
+                if (sp.temperature >= 0)
+                    builder.temperature(sp.temperature);
+                if (sp.top_k >= 0)
+                    builder.top_k(sp.top_k);
+                if (sp.top_p.first >= 0)
+                    builder.top_p(
+                        sp.top_p.first,
+                        sp.top_p.second);
+                builder.seed(sp.seed);
+                ASSIGN_OR_RETURN(
+                    sampler,
+                    builder.build());
+
+                ASSIGN_OR_RETURN(
+                    session,
+                    infer::Session::create(
+                        model, cp,
+                        std::move(sampler)));
+
+                infer::GenerationConfig conf;
+                conf.add_special = tp.add_special;
+                conf.parse_special = tp.parse_special;
+                conf.max_tokens = dp.max_tokens;
+
+                InferenceNode node(id, bus, session);
+                node.set_config(conf);
+
+                return ResultV<InferenceNode>::Ok(node);
+            }
+
+            static ResultV<InferenceNode>
+            default_create(
+                const Str &id,
+                infer::TokenizeParams tp,
+                infer::DecodeParams dp,
+                infer::SampleParams sp,
+                MulPtr<EventBus> bus = nullptr)
+            {
+                using InferRes =
+                    ResultV<InferenceNode>;
+
+                if (!core::GlobalConfigManager::instance().loaded())
+                    return InferRes::Err(
+                        utils::ErrorBuilder()
+                            .pipeline()
+                            .config_load_failed()
+                            .message("Config has not loaded yet.")
+                            .build());
+
+                const auto &conf =
+                    core::GlobalConfigManager::instance()
+                        .current();
+
+                auto &cp = conf.context_params;
+                ASSIGN_OR_RETURN(
+                    model,
+                    core::ModelManager::instance()
+                        .load_config_model());
+
+                return create(id, model, cp, tp, dp, sp, bus);
             }
 
         public:
@@ -64,7 +146,13 @@ namespace astra_rp
                         ? m_prompt_builder(m_inputs)
                         : "";
 
-                infer::TokenizeTask tok_task(m_session->model(), prompt);
+                infer::TokenizeTask tok_task(
+                    m_session->model(),
+                    prompt,
+                    {
+                        m_config.add_special,
+                        m_config.parse_special,
+                    });
                 TRY(tok_task.execute());
 
                 Vec<Token> pending_tokens = tok_task.tokens(); // 初始的 Prompt tokens

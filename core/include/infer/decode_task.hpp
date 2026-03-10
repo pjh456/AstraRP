@@ -3,6 +3,7 @@
 
 #include "utils/types.hpp"
 #include "infer/i_task.hpp"
+#include "infer/engine.hpp"
 
 namespace astra_rp
 {
@@ -14,14 +15,18 @@ namespace astra_rp
         {
         private:
             MulPtr<Session> m_session;
+            DecodeParams m_params;
+
             Vec<Token> m_tokens;
 
         public:
             DecodeTask(
                 MulPtr<Session> session,
-                Vec<Token> tokens)
+                Vec<Token> tokens,
+                DecodeParams params = {})
                 : m_session(session),
-                  m_tokens(std::move(tokens)) {}
+                  m_tokens(std::move(tokens)),
+                  m_params(params) {}
 
         public:
             Str name() const noexcept override { return "DecodeTask"; }
