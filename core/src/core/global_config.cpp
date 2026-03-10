@@ -102,7 +102,7 @@ namespace astra_rp
             }
 
             file << "{";
-            file << "\"model_dir\":" << m_data.model_dir << ",";
+            file << "\"model_dir\":" << "\"" << m_data.model_dir << "\",";
             {
                 auto meta = m_data.model_params.metadata();
                 file << "\"model_params\":{";
