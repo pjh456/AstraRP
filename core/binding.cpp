@@ -10,6 +10,8 @@
 #include "pipeline/inference_node.hpp"
 #include "pipeline/format_node.hpp"
 #include "pipeline/output_node.hpp"
+#include "core/tokenizer.hpp"
+#include "core/model_manager.hpp"
 
 using namespace astra_rp;
 
@@ -42,6 +44,44 @@ Napi::Value InitSystem(const Napi::CallbackInfo &info)
     }
 
     return Napi::Boolean::New(env, true);
+}
+
+Napi::Value Detokenize(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+    // 参数1：模型名称 (比如 "default")
+    // 参数2：Token 数组 [123, 456, 789]
+    if (info.Length() < 2 || !info[1].IsArray())
+    {
+        Napi::TypeError::New(env, "Expected model_name and token array").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    Napi::Array token_array = info[1].As<Napi::Array>();
+    std::vector<int32_t> tokens;
+    for (uint32_t i = 0; i < token_array.Length(); ++i)
+    {
+        tokens.push_back(token_array.Get(i).As<Napi::Number>().Int32Value());
+    }
+
+    // 获取当前模型 (基于你的框架，这里复用 config 模型获取)
+    auto modelRes = astra_rp::core::ModelManager::instance().load_config_model();
+    if (modelRes.is_err())
+    {
+        Napi::Error::New(env, "Model not loaded").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    // 调用引擎层的 Detokenize
+    auto strRes = astra_rp::core::Tokenizer::detokenize(modelRes.unwrap(), tokens);
+    if (strRes.is_err())
+    {
+        Napi::Error::New(env, strRes.unwrap_err().to_string()).ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    return Napi::String::New(env, strRes.unwrap());
 }
 
 // 2. 异步 Worker：用于在后台运行 Scheduler，不阻塞 Node 主线程
@@ -294,6 +334,7 @@ public:
 Napi::Object InitAll(Napi::Env env, Napi::Object exports)
 {
     exports.Set("initSystem", Napi::Function::New(env, InitSystem));
+    exports.Set("detokenize", Napi::Function::New(env, Detokenize));
     return PipelineWrapper::Init(env, exports);
 }
 
