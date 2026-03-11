@@ -18,16 +18,25 @@ Napi::Value InitSystem(const Napi::CallbackInfo &info)
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsString())
     {
-        Napi::TypeError::New(env, "String expected for config path").ThrowAsJavaScriptException();
+        Napi::TypeError::New(
+            env,
+            "String expected for config path")
+            .ThrowAsJavaScriptException();
         return env.Null();
     }
 
-    std::string configPath = info[0].As<Napi::String>().Utf8Value();
-    auto res = core::GlobalConfigManager::instance().load_from_file(configPath);
+    std::string configPath =
+        info[0].As<Napi::String>().Utf8Value();
+    auto res =
+        core::GlobalConfigManager::instance()
+            .load_from_file(configPath);
 
     if (res.is_err())
     {
-        Napi::Error::New(env, res.unwrap_err().to_string()).ThrowAsJavaScriptException();
+        Napi::Error::New(
+            env,
+            res.unwrap_err().to_string())
+            .ThrowAsJavaScriptException();
         return env.Null();
     }
 
@@ -44,7 +53,9 @@ private:
             utils::Result<void, utils::Error>::Ok();
 
 public:
-    PipelineRunWorker(Napi::Function &callback, std::shared_ptr<pipeline::Scheduler> scheduler)
+    PipelineRunWorker(
+        Napi::Function &callback,
+        std::shared_ptr<pipeline::Scheduler> scheduler)
         : Napi::AsyncWorker(callback), m_scheduler(scheduler) {}
 
     ~PipelineRunWorker() {}
@@ -83,7 +94,27 @@ private:
 public:
     static Napi::Object Init(Napi::Env env, Napi::Object exports)
     {
-        Napi::Function func = DefineClass(env, "Pipeline", {InstanceMethod("addFormatNode", &PipelineWrapper::AddFormatNode), InstanceMethod("addInferenceNode", &PipelineWrapper::AddInferenceNode), InstanceMethod("addEdge", &PipelineWrapper::AddEdge), InstanceMethod("onToken", &PipelineWrapper::OnToken), InstanceMethod("run", &PipelineWrapper::Run)});
+        Napi::Function func =
+            DefineClass(
+                env,
+                "Pipeline",
+                {
+                    InstanceMethod(
+                        "addFormatNode",
+                        &PipelineWrapper::AddFormatNode),
+                    InstanceMethod(
+                        "addInferenceNode",
+                        &PipelineWrapper::AddInferenceNode),
+                    InstanceMethod(
+                        "addEdge",
+                        &PipelineWrapper::AddEdge),
+                    InstanceMethod(
+                        "onToken",
+                        &PipelineWrapper::OnToken),
+                    InstanceMethod(
+                        "run",
+                        &PipelineWrapper::Run),
+                });
 
         Napi::FunctionReference *constructor = new Napi::FunctionReference();
         *constructor = Napi::Persistent(func);
@@ -93,7 +124,8 @@ public:
         return exports;
     }
 
-    PipelineWrapper(const Napi::CallbackInfo &info) : Napi::ObjectWrap<PipelineWrapper>(info)
+    PipelineWrapper(const Napi::CallbackInfo &info)
+        : Napi::ObjectWrap<PipelineWrapper>(info)
     {
         m_graph = std::make_shared<pipeline::Graph>();
         m_bus = std::make_shared<pipeline::EventBus>();
@@ -106,7 +138,8 @@ public:
         std::string id = info[0].As<Napi::String>().Utf8Value();
         std::string prompt = info[1].As<Napi::String>().Utf8Value(); // 简单的静态 prompt 演示
 
-        auto formatter = [prompt](const HashMap<Str, pipeline::NodePayload> &inputs) -> Str
+        auto formatter =
+            [prompt](const HashMap<Str, pipeline::NodePayload> &inputs) -> Str
         {
             return prompt; // 实际逻辑可以合并 inputs
         };
@@ -126,6 +159,7 @@ public:
         // 使用你框架中的默认构造
         infer::TokenizeParams tp;
         infer::DecodeParams dp;
+        dp.max_tokens = 100;
         infer::SampleParams sp;
 
         auto nodeRes = pipeline::InferenceNode::default_create(id, tp, dp, sp, m_bus);
@@ -135,7 +169,15 @@ public:
             return env.Undefined();
         }
 
-        auto node = std::make_shared<pipeline::InferenceNode>(nodeRes.unwrap());
+        auto infer_node = std::move(nodeRes.unwrap());
+        infer_node.set_prompt_builder(
+            [](const HashMap<Str, pipeline::NodePayload> &inputs) -> Str
+            {
+                if (inputs.empty())
+                    return ""; // 兜底防止空指针
+                return inputs.begin()->second.output;
+            });
+        auto node = std::make_shared<pipeline::InferenceNode>(infer_node);
         m_graph->add_node(node);
 
         return env.Undefined();
@@ -164,7 +206,8 @@ public:
         m_bus->subscribe_token([this](const Str &id, const Str &text)
                                {
             // 包装参数传给 JS
-            auto callback =[](Napi::Env env, Napi::Function jsCb, std::pair<Str, Str>* data) {
+            auto callback =
+            [](Napi::Env env, Napi::Function jsCb, std::pair<Str, Str>* data) {
                 jsCb.Call({ Napi::String::New(env, data->first), Napi::String::New(env, data->second) });
                 delete data;
             };
