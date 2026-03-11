@@ -12,7 +12,6 @@ namespace astra_rp
         class ModelManager;
         class ModelParams;
         class ModelParamsBuilder;
-        class ModelParamsMetaData;
 
         struct ModelParamsMetaData
         {
