@@ -63,8 +63,10 @@ set(LLAMA_OPENSSL OFF CACHE BOOL "Disable llama.cpp openssl" FORCE)
 
 set(HAVE_STD_REGEX 1) # make benchmark happy
 
-# set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
-# set(LLAMA_SHARED OFF CACHE BOOL "Disable llama shared lib" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries" FORCE)
+set(LLAMA_SHARED OFF CACHE BOOL "Disable llama shared lib" FORCE)
+set(GGML_SHARED OFF CACHE BOOL "Disable ggml shared lib" FORCE)
+
 set(LLAMA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
 
 # set(BUILD_SHARED_LIBS OFF)
