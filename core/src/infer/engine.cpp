@@ -293,8 +293,6 @@ namespace astra_rp
             MulPtr<Session> session,
             Vec<MulPtr<core::Batch>> batches)
         {
-            ContextTransaction tx(session);
-
             for (auto &batch : batches)
             {
                 TRY(decode(session, batch)

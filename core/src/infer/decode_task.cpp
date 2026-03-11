@@ -2,6 +2,7 @@
 
 #include "infer/session.hpp"
 #include "infer/engine.hpp"
+#include "infer/context_transaction.hpp"
 
 namespace astra_rp
 {
@@ -10,6 +11,8 @@ namespace astra_rp
         ResultV<void>
         DecodeTask::execute()
         {
+            ContextTransaction tx(m_session);
+
             ASSIGN_OR_RETURN(
                 batches,
                 Engine::instance()
@@ -37,6 +40,8 @@ namespace astra_rp
                                 .wrap(std::move(err))
                                 .build();
                         }));
+
+            tx.commit();
 
             return ResultV<void>::Ok();
         }
