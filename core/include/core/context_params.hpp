@@ -9,7 +9,6 @@ namespace astra_rp
     {
         class ContextManager;
         class ContextParamsBuilder;
-        class ContextParamsMetaData;
 
         struct ContextParamsMetaData
         {
