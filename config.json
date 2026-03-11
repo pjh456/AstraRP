@@ -1,0 +1,17 @@
+{
+    "model_dir": "./models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+    "model_params": {
+        "gpu_layers": 0,
+        "use_mlock": false,
+        "use_mmap": true
+    },
+    "context_params": {
+        "context_size": 4096,
+        "batch_size": 256,
+        "max_seqs": 1,
+        "threads": 2,
+        "threads_batch": 2,
+        "flash_attention": true
+    },
+    "max_concurrency": 1
+}
