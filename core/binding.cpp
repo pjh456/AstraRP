@@ -7,8 +7,9 @@
 #include "pipeline/graph.hpp"
 #include "pipeline/scheduler.hpp"
 #include "pipeline/event_bus.hpp"
-#include "pipeline/format_node.hpp"
 #include "pipeline/inference_node.hpp"
+#include "pipeline/format_node.hpp"
+#include "pipeline/output_node.hpp"
 
 using namespace astra_rp;
 
@@ -91,6 +92,12 @@ private:
     // 保存 ThreadSafeFunction 以防止被垃圾回收
     Napi::ThreadSafeFunction m_tsfn_token;
 
+    // [新增] 用来保存 Output 节点的引用，方便后续直接查数据和清空
+    std::unordered_map<
+        std::string,
+        std::shared_ptr<pipeline::OutputNode>>
+        m_output_nodes;
+
 public:
     static Napi::Object Init(Napi::Env env, Napi::Object exports)
     {
@@ -105,6 +112,15 @@ public:
                     InstanceMethod(
                         "addInferenceNode",
                         &PipelineWrapper::AddInferenceNode),
+                    InstanceMethod(
+                        "addOutputNode",
+                        &PipelineWrapper::AddOutputNode),
+                    InstanceMethod(
+                        "getOutputContent",
+                        &PipelineWrapper::GetOutputContent),
+                    InstanceMethod(
+                        "clearOutput",
+                        &PipelineWrapper::ClearOutput),
                     InstanceMethod(
                         "addEdge",
                         &PipelineWrapper::AddEdge),
@@ -181,6 +197,39 @@ public:
         m_graph->add_node(node);
 
         return env.Undefined();
+    }
+
+    // 添加 Output 节点
+    Napi::Value AddOutputNode(const Napi::CallbackInfo &info)
+    {
+        std::string id = info[0].As<Napi::String>().Utf8Value();
+        auto node = std::make_shared<pipeline::OutputNode>(id, m_bus);
+        m_graph->add_node(node);
+        m_output_nodes[id] = node; // 记录引用
+        return info.Env().Undefined();
+    }
+
+    // 获取内容
+    Napi::Value GetOutputContent(const Napi::CallbackInfo &info)
+    {
+        Napi::Env env = info.Env();
+        std::string id = info[0].As<Napi::String>().Utf8Value();
+        if (m_output_nodes.count(id))
+        {
+            return Napi::String::New(env, m_output_nodes[id]->content());
+        }
+        return Napi::String::New(env, "");
+    }
+
+    // 清空内容
+    Napi::Value ClearOutput(const Napi::CallbackInfo &info)
+    {
+        std::string id = info[0].As<Napi::String>().Utf8Value();
+        if (m_output_nodes.count(id))
+        {
+            m_output_nodes[id]->clear();
+        }
+        return info.Env().Undefined();
     }
 
     // 添加边
