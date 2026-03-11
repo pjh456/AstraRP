@@ -17,6 +17,10 @@
 #define EASY_SERIALIZE_BOOL_END(method) JSON_KEY_VAL(file, method, (meta.method ? "true" : "false"))
 #define EASY_SERIALIZE_BOOL(method) EASY_SERIALIZE_BOOL_END(method) << ","
 
+#define PARAM_CHECKER(obj, name, type) \
+    if (!obj->contains(#name))         \
+    return type(utils::ErrorBuilder().core().config_load_failed().message(#name "not find in config").build())
+
 namespace astra_rp
 {
     namespace core
@@ -46,8 +50,12 @@ namespace astra_rp
             Parser parser(config);
 
             auto json = parser.parse();
+            auto json_obj = json.get()->as_object();
 
+            PARAM_CHECKER(json_obj, model_dir, ResultV<void>);
             m_data.model_dir = json["model_dir"].as_str();
+
+            PARAM_CHECKER(json_obj, model_params, ResultV<void>);
             {
                 auto mp = json["model_params"];
                 auto mp_data = mp.get()->as_object();
@@ -60,6 +68,7 @@ namespace astra_rp
                 m_data.model_params = builder.build();
             }
 
+            PARAM_CHECKER(json_obj, context_params, ResultV<void>);
             {
                 auto cp = json["context_params"];
                 auto cp_data = cp.get()->as_object();
@@ -76,7 +85,9 @@ namespace astra_rp
             }
 
             m_data.max_concurrency =
-                json["max_concurrency"].as_int();
+                json_obj->contains("max_concurrency")
+                    ? json["max_concurrency"].as_int()
+                    : 1;
 
             delete json.get();
 
