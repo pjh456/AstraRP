@@ -92,9 +92,16 @@ app.post('/api/run', (req, res) => {
     });
 
     let isFinished = false;
-    req.on('close', () => {
-        if (!isFinished) {
-            console.log("Client aborted request, stopping pipeline...");
+    let isClientDisconnected = false;
+
+    // NOTE:
+    // req.close 在请求体读取完成后也可能触发，不能用它来判断“客户端中断”。
+    // 改为监听 response 的 close，并结合 writableEnded 判断是否是异常断开。
+    res.on('close', () => {
+        const disconnectedEarly = !res.writableEnded;
+        if (!isFinished && disconnectedEarly) {
+            isClientDisconnected = true;
+            console.log("Client aborted response stream, stopping pipeline...");
             pipeline.stop();
         }
     });
@@ -102,15 +109,21 @@ app.post('/api/run', (req, res) => {
     // 开始执行
     pipeline.run((err, result) => {
         isFinished = true;
-        if (err) {
+        if (isClientDisconnected) {
+            console.log("Pipeline stopped because client disconnected.");
+        } else if (err) {
             console.error("Pipeline Error:", err);
             res.write(JSON.stringify({ error: err.message }) + '\n');
         } else {
             console.log("Pipeline Finished.");
             res.write(JSON.stringify({ done: true }) + '\n');
         }
-        // 执行完毕，关闭 HTTP 连接
-        res.end();
+
+        // 客户端已断开时，避免继续写入已关闭的响应流
+        if (!res.writableEnded) {
+            // 执行完毕，关闭 HTTP 连接
+            res.end();
+        }
 
         // 推理结束，手动释放 C++ 内存，归还大模型 KV Context
         pipeline.dispose();
