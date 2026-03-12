@@ -162,11 +162,14 @@ function AppCanvas() {
 
   const handleIncomingToken = (nodeId: string, char: string) => {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const adjacency = new Map<string, string[]>();
+    const adjacencySet = new Map<string, Set<string>>();
     for (const edge of edges) {
-      if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
-      adjacency.get(edge.source)?.push(edge.target);
+      if (!adjacencySet.has(edge.source)) adjacencySet.set(edge.source, new Set());
+      adjacencySet.get(edge.source)?.add(edge.target);
     }
+    const adjacency = new Map<string, string[]>(
+      Array.from(adjacencySet.entries()).map(([source, targets]) => [source, Array.from(targets)])
+    );
 
     const emittingNode = nodeById.get(nodeId);
     if (!emittingNode) return;
@@ -508,7 +511,9 @@ function AppCanvas() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nodes: nodes.map((node) => ({ id: node.id, type: node.type, data: node.data })),
-          edges: edges.map((edge) => ({ source: edge.source, target: edge.target }))
+          edges: Array.from(
+            new Map(edges.map((edge) => [`${edge.source}->${edge.target}`, { source: edge.source, target: edge.target }])).values()
+          )
         }),
         signal: abortControllerRef.current.signal
       });
