@@ -1,7 +1,14 @@
 import { Handle, Position } from '@xyflow/react';
+import type { NodeProps } from '@xyflow/react';
 import { FileText } from 'lucide-react';
 
-export default function FormatNode({ data }: any) {
+type FormatNodeData = {
+    formatStr: string;
+};
+
+export default function FormatNode({ data }: NodeProps) {
+    const nodeData = data as FormatNodeData;
+
     return (
         <div className="bg-gray-800 border border-blue-500 rounded-lg shadow-lg min-w-[200px] overflow-hidden">
             <div className="bg-blue-600/20 px-3 py-2 border-b border-blue-500/50 flex items-center gap-2">
@@ -10,8 +17,8 @@ export default function FormatNode({ data }: any) {
             </div>
 
             <div className="p-3 text-xs text-gray-400">
-                <p className="truncate w-40 text-gray-200" title={data.formatStr}>
-                    {data.formatStr || 'User: {input}\nAssistant:'}
+                <p className="truncate w-40 text-gray-200" title={nodeData.formatStr}>
+                    {nodeData.formatStr || 'User: {input}\nAssistant:'}
                 </p>
             </div>
 

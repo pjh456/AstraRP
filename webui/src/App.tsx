@@ -6,7 +6,8 @@ import {
   ConnectionMode,
   useNodesState,
   useEdgesState,
-  addEdge
+  addEdge,
+  useReactFlow
 } from '@xyflow/react';
 import type {
   Node,
@@ -128,7 +129,9 @@ export default function App() {
   const [selectedEdges, setSelectedEdges] = useState<AppEdge[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  const { screenToFlowPosition } = useReactFlow<AppNode, AppEdge>();
   const outputBuffer = useRef('');
 
   const nodeTypes = useMemo(
@@ -201,7 +204,7 @@ export default function App() {
       target,
       type: 'tokenEdge',
       animated: false,
-      style: { stroke: '#a855f7', strokeWidth: 2 },
+      style: { stroke: '#a855f7', strokeWidth: 2, strokeDasharray: '5,5' },
       data: { tokens: [] }
     };
     setEdges((eds) => addEdge(newEdge, eds));
@@ -216,7 +219,7 @@ export default function App() {
     const newNode: AppNode = {
       id: nodeId,
       type,
-      position: { x: contextMenu.x, y: contextMenu.y },
+      position: { x: contextMenu.flowX, y: contextMenu.flowY },
       data: structuredClone(defaultNodeData[type])
     } as AppNode;
 
@@ -280,7 +283,7 @@ export default function App() {
     setEdges((eds) =>
       eds.map((edge) =>
         edge.id === edgeId
-          ? { ...edge, style: { ...(edge.style ?? {}), stroke, strokeWidth: 2 } }
+          ? { ...edge, style: { ...(edge.style ?? {}), stroke, strokeWidth: 2, strokeDasharray: '5,5' } }
           : edge
       )
     );
@@ -348,6 +351,7 @@ export default function App() {
           target: newTarget,
           selected: true,
           animated: false,
+          style: { ...(edge.style ?? {}), strokeDasharray: '5,5' },
           data: { tokens: [] }
         };
       });
@@ -378,7 +382,7 @@ export default function App() {
 
     outputBuffer.current = '';
     setNodes((nds) => nds.map((n) => (n.type === 'outputNode' ? { ...n, data: { text: '' } } : n)));
-    setEdges((eds) => eds.map((e) => ({ ...e, animated: true, data: { tokens: [] } })));
+    setEdges((eds) => eds.map((e) => ({ ...e, animated: true, style: { ...(e.style ?? {}), strokeDasharray: '5,5' }, data: { tokens: [] } })));
 
     try {
       const formatNode = nodes.find((n) => n.type === 'formatNode') as Node<FormatNodeData>;
@@ -434,7 +438,7 @@ export default function App() {
       }
     } finally {
       setIsRunning(false);
-      setEdges((eds) => eds.map((e) => ({ ...e, animated: false })));
+      setEdges((eds) => eds.map((e) => ({ ...e, animated: false, style: { ...(e.style ?? {}), strokeDasharray: '5,5' } })));
     }
   };
 
@@ -463,7 +467,7 @@ export default function App() {
         onStop={stopPipeline}
         isRunning={isRunning}
       />
-      <div className="flex-1 h-full relative" onClick={() => setContextMenu(null)}>
+      <div ref={paneRef} className="flex-1 h-full relative" onClick={() => setContextMenu(null)}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -480,8 +484,15 @@ export default function App() {
           onSelectionChange={handleSelectionChange}
           onPaneContextMenu={(event) => {
             event.preventDefault();
-            if (isRunning) return;
-            setContextMenu({ x: event.clientX - 320, y: event.clientY });
+            if (isRunning || !paneRef.current) return;
+            const rect = paneRef.current.getBoundingClientRect();
+            const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+            setContextMenu({
+              x: event.clientX - rect.left,
+              y: event.clientY - rect.top,
+              flowX: flowPosition.x,
+              flowY: flowPosition.y
+            });
           }}
           fitView
           proOptions={{ hideAttribution: true }}
