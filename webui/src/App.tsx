@@ -244,20 +244,25 @@ function AppCanvas() {
       }
     }
 
+    // 将 Ref 的突变操作提取到 setState 外部，避免 React 严格模式重复执行导致 token 翻倍
+    for (const node of nodes) {
+      const increment = outputIncrements.get(node.id) ?? 0;
+      if (node.type === 'outputNode' && (increment > 0 || switchedToOutputMode)) {
+        const baseText = switchedToOutputMode ? '' : (outputBuffers.current[node.id] ?? '');
+        const nextText = increment > 0 ? `${baseText}${char.repeat(increment)}` : baseText;
+        outputBuffers.current[node.id] = nextText;
+      }
+    }
+
     setNodes((nds) =>
       nds.map((node) => {
-        const baseText = switchedToOutputMode && node.type === 'outputNode'
-          ? ''
-          : (outputBuffers.current[node.id] ?? '');
         const increment = outputIncrements.get(node.id) ?? 0;
         if (node.type === 'outputNode' && (increment > 0 || switchedToOutputMode)) {
-          const nextText = increment > 0 ? `${baseText}${char.repeat(increment)}` : baseText;
-          outputBuffers.current[node.id] = nextText;
           const data = node.data as OutputNodeData & { onClear?: (id: string) => void };
 
           return {
             ...node,
-            data: { ...data, text: nextText }
+            data: { ...data, text: outputBuffers.current[node.id] }
           };
         }
         return node;
@@ -575,12 +580,12 @@ function AppCanvas() {
       nodes.map((node) =>
         node.type === 'outputNode'
           ? {
-              ...node,
-              data: {
-                ...(node.data as OutputNodeData),
-                onClear: clearOutputContent
-              }
+            ...node,
+            data: {
+              ...(node.data as OutputNodeData),
+              onClear: clearOutputContent
             }
+          }
           : node
       ) as AppNode[],
     [nodes, clearOutputContent]
