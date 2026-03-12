@@ -141,6 +141,7 @@ function AppCanvas() {
   const paneRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition } = useReactFlow<AppNode, AppEdge>();
   const outputBuffers = useRef<Record<string, string>>({});
+  const tokenRoutingMode = useRef<'unknown' | 'inferOnly' | 'outputEmits'>('unknown');
 
   const nodeTypes = useMemo(
     () => ({
@@ -160,18 +161,81 @@ function AppCanvas() {
   const isMultiSelection = selectedNodes.length + selectedEdges.length > 1;
 
   const handleIncomingToken = (nodeId: string, char: string) => {
-    const emittingNode = nodes.find((node) => node.id === nodeId);
-    const reachableOutputIds = new Set<string>();
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const adjacency = new Map<string, string[]>();
+    for (const edge of edges) {
+      if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
+      adjacency.get(edge.source)?.push(edge.target);
+    }
 
-    // 只把文本写入“当前发出 token 的 output 节点”，避免 infer/output 双重回调造成重复累积。
-    if (emittingNode?.type === 'outputNode') {
-      reachableOutputIds.add(nodeId);
+    const emittingNode = nodeById.get(nodeId);
+    if (!emittingNode) return;
+
+    if (tokenRoutingMode.current === 'unknown') {
+      tokenRoutingMode.current = emittingNode.type === 'outputNode' ? 'outputEmits' : 'inferOnly';
+    }
+
+    const shouldPropagateThroughOutputs =
+      tokenRoutingMode.current === 'inferOnly' || emittingNode.type === 'outputNode';
+
+    const nodePathCount = new Map<string, number>();
+    const edgePathCount = new Map<string, number>();
+    nodePathCount.set(nodeId, 1);
+
+    const queue: string[] = [nodeId];
+    let guard = 0;
+
+    while (queue.length > 0 && guard < 10000) {
+      guard += 1;
+      const current = queue.shift() as string;
+      const currentCount = nodePathCount.get(current) ?? 0;
+      const currentNode = nodeById.get(current);
+      if (!currentNode || currentCount <= 0) continue;
+
+      const nextNodes = adjacency.get(current) ?? [];
+      for (const next of nextNodes) {
+        const edgeKey = `${current}->${next}`;
+        edgePathCount.set(edgeKey, (edgePathCount.get(edgeKey) ?? 0) + currentCount);
+
+        const nextNode = nodeById.get(next);
+        if (!nextNode) continue;
+
+        if (nextNode.type === 'outputNode' && !shouldPropagateThroughOutputs) {
+          continue;
+        }
+
+        nodePathCount.set(next, (nodePathCount.get(next) ?? 0) + currentCount);
+        queue.push(next);
+      }
+    }
+
+    const outputIncrements = new Map<string, number>();
+
+    if (tokenRoutingMode.current === 'inferOnly') {
+      for (const [id, count] of nodePathCount.entries()) {
+        const node = nodeById.get(id);
+        if (node?.type === 'outputNode' && count > 0) {
+          outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
+        }
+      }
+    } else {
+      if (emittingNode.type === 'outputNode') {
+        outputIncrements.set(nodeId, (outputIncrements.get(nodeId) ?? 0) + 1);
+      }
+      for (const [id, count] of nodePathCount.entries()) {
+        if (id === nodeId) continue;
+        const node = nodeById.get(id);
+        if (node?.type === 'outputNode' && count > 0) {
+          outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
+        }
+      }
     }
 
     setNodes((nds) =>
       nds.map((node) => {
-        if (reachableOutputIds.has(node.id) && node.type === 'outputNode') {
-          const nextText = `${outputBuffers.current[node.id] ?? ''}${char}`;
+        const increment = outputIncrements.get(node.id) ?? 0;
+        if (increment > 0 && node.type === 'outputNode') {
+          const nextText = `${outputBuffers.current[node.id] ?? ''}${char.repeat(increment)}`;
           outputBuffers.current[node.id] = nextText;
           const data = node.data as OutputNodeData & { onClear?: (id: string) => void };
 
@@ -186,9 +250,11 @@ function AppCanvas() {
 
     setEdges((eds) =>
       eds.map((edge) => {
-        if (edge.source === nodeId) {
+        const edgeKey = `${edge.source}->${edge.target}`;
+        const increment = edgePathCount.get(edgeKey) ?? 0;
+        if (increment > 0) {
           const tokens = edge.data?.tokens ?? [];
-          return { ...edge, data: { tokens: [...tokens, char] } };
+          return { ...edge, data: { tokens: [...tokens, ...Array.from({ length: increment }, () => char)] } };
         }
         return edge;
       })
@@ -423,6 +489,7 @@ function AppCanvas() {
     abortControllerRef.current = new AbortController();
 
     outputBuffers.current = {};
+    tokenRoutingMode.current = 'unknown';
     setNodes((nds) => nds.map((n) => (n.type === 'outputNode' ? { ...n, data: { ...(n.data as OutputNodeData), text: '' } } : n)));
     setEdges((eds) => eds.map((e) => ({ ...e, animated: true, style: { ...(e.style ?? {}), strokeDasharray: '5,5' }, data: { tokens: [] } })));
 
