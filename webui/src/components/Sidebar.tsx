@@ -2,9 +2,11 @@ import type { Node } from '@xyflow/react';
 
 interface SidebarProps {
     selectedNode: Node | null;
+    onRun: () => void;
+    isRunning: boolean;
 }
 
-export default function Sidebar({ selectedNode }: SidebarProps) {
+export default function Sidebar({ selectedNode, onRun, isRunning }: SidebarProps) {
     return (
         <aside className="w-80 h-full bg-gray-900 border-r border-gray-800 flex flex-col">
             <div className="p-4 border-b border-gray-800">
@@ -48,8 +50,15 @@ export default function Sidebar({ selectedNode }: SidebarProps) {
             </div>
 
             <div className="p-4 border-t border-gray-800">
-                <button className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors font-medium shadow-lg shadow-purple-900/20">
-                    ▶ Run Pipeline
+                <button
+                    onClick={onRun}
+                    disabled={isRunning}
+                    className={`w-full py-2 rounded transition-colors font-medium shadow-lg 
+            ${isRunning
+                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                            : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-900/20'}`}
+                >
+                    {isRunning ? 'Running...' : '▶ Run Pipeline'}
                 </button>
             </div>
         </aside>

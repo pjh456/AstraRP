@@ -90,6 +90,7 @@ export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initEdges);
   const [selectedNode, setSelectedNode] = useState<AppNode | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
   // 引用缓冲，用于积累文本，避免高频 React 渲染卡顿
   const outputBuffer = useRef('');
@@ -178,9 +179,73 @@ export default function App() {
     setSelectedNode(params.nodes?.[0] as AppNode || null);
   };
 
+  const runPipeline = async () => {
+    if (isRunning) return;
+    setIsRunning(true);
+
+    // 清空前端缓存与界面状态
+    outputBuffer.current = '';
+    setNodes((nds) => nds.map(n => n.id === 'out_1' ? { ...n, data: { text: '' } } : n));
+    setEdges((eds) => eds.map(e => ({ ...e, data: { tokens: [] } })));
+
+    try {
+      // 提取 FormatNode 里的 prompt 作为参数
+      const formatNode = nodes.find(n => n.id === 'format_1') as Node<FormatNodeData>;
+      const formatStr = formatNode?.data?.formatStr || "User: Hello\nAssistant:";
+
+      // 向我们刚才写的 Node.js 桥接服务器发起请求
+      const response = await fetch('http://localhost:3000/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formatStr })
+      });
+
+      if (!response.body) throw new Error("ReadableStream not supported");
+
+      // 处理流式响应 (NDJSON 解析)
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let chunkBuffer = ''; // 用于处理被截断的 JSON 行
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        chunkBuffer += decoder.decode(value, { stream: true });
+        const lines = chunkBuffer.split('\n');
+
+        // 留着最后一行（可能是不完整的 JSON）到下个循环处理
+        chunkBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const data = JSON.parse(line);
+
+          if (data.error) {
+            console.error("Backend Error:", data.error);
+            alert("Error: " + data.error);
+          } else if (data.done) {
+            console.log("Pipeline execution finished!");
+          } else if (data.text) {
+            // 将真实的 Token 喂给我们的更新函数！
+            handleIncomingToken(data.nodeId, data.text);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Run pipeline failed:", err);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   return (
     <div className="flex bg-gray-900" style={{ width: '100vw', height: '100vh' }}>
-      <Sidebar selectedNode={selectedNode} />
+      <Sidebar
+        selectedNode={selectedNode}
+        onRun={runPipeline}
+        isRunning={isRunning}
+      />
       <div className="flex-1 h-full relative">
         <ReactFlow
           nodes={nodes}
