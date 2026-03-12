@@ -55,20 +55,34 @@ try {
 app.post('/api/run', (req, res) => {
     const { formatStr } = req.body;
 
-    // 设置 HTTP 响应头，保持连接不断开，用于流式传输
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Transfer-Encoding', 'chunked');
+    // 明确写入流式协议头，关闭缓存，并防止 Express 内部自动干扰
+    res.writeHead(200, {
+        'Content-Type': 'application/x-ndjson',
+        'Transfer-Encoding': 'chunked',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
+    });
+
 
     console.log("Building pipeline for new request...");
     const pipeline = new astra.Pipeline();
 
-    // 根据前端传来的参数构建 DAG (暂时硬编码图结构，参数动态化)
-    pipeline.addFormatNode("format_1", formatStr || "User: Hello\nAssistant:");
-    pipeline.addInferenceNode("infer_1");
-    pipeline.addOutputNode("out_1");
+    // 放入 try-catch 防止显存 OOM 导致服务器崩溃
+    try {
+        // 根据前端传来的参数构建 DAG (暂时硬编码图结构，参数动态化)
+        pipeline.addFormatNode("format_1", formatStr || "User: Hello\nAssistant:");
+        pipeline.addInferenceNode("infer_1");
+        pipeline.addOutputNode("out_1");
 
-    pipeline.addEdge("format_1", "infer_1");
-    pipeline.addEdge("infer_1", "out_1");
+        pipeline.addEdge("format_1", "infer_1");
+        pipeline.addEdge("infer_1", "out_1");
+    } catch (e) {
+        console.error("Pipeline initialization failed (Likely OOM):", e);
+        res.write(JSON.stringify({ error: e.message }) + '\n');
+        res.end();
+        pipeline.dispose(); // 初始化失败也要释放
+        return;
+    }
 
     // 绑定 Token 流水线回调
     pipeline.onToken((nodeId, text) => {
@@ -77,8 +91,17 @@ app.post('/api/run', (req, res) => {
         res.write(chunk);
     });
 
+    let isFinished = false;
+    req.on('close', () => {
+        if (!isFinished) {
+            console.log("Client aborted request, stopping pipeline...");
+            pipeline.stop();
+        }
+    });
+
     // 开始执行
     pipeline.run((err, result) => {
+        isFinished = true;
         if (err) {
             console.error("Pipeline Error:", err);
             res.write(JSON.stringify({ error: err.message }) + '\n');
@@ -88,6 +111,9 @@ app.post('/api/run', (req, res) => {
         }
         // 执行完毕，关闭 HTTP 连接
         res.end();
+
+        // 推理结束，手动释放 C++ 内存，归还大模型 KV Context
+        pipeline.dispose();
     });
 });
 

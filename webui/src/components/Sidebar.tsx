@@ -3,10 +3,11 @@ import type { Node } from '@xyflow/react';
 interface SidebarProps {
     selectedNode: Node | null;
     onRun: () => void;
+    onStop: () => void;
     isRunning: boolean;
 }
 
-export default function Sidebar({ selectedNode, onRun, isRunning }: SidebarProps) {
+export default function Sidebar({ selectedNode, onRun, onStop, isRunning }: SidebarProps) {
     return (
         <aside className="w-80 h-full bg-gray-900 border-r border-gray-800 flex flex-col">
             <div className="p-4 border-b border-gray-800">
@@ -49,16 +50,28 @@ export default function Sidebar({ selectedNode, onRun, isRunning }: SidebarProps
                 )}
             </div>
 
-            <div className="p-4 border-t border-gray-800">
+            <div className="p-4 border-t border-gray-800 flex gap-2">
                 <button
+                    type="button" // 防止触发意外的页面重载
                     onClick={onRun}
                     disabled={isRunning}
-                    className={`w-full py-2 rounded transition-colors font-medium shadow-lg 
-            ${isRunning
+                    className={`flex-1 py-2 rounded transition-colors font-medium shadow-lg 
+                        ${isRunning
                             ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                             : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-900/20'}`}
                 >
-                    {isRunning ? 'Running...' : '▶ Run Pipeline'}
+                    {isRunning ? 'Running...' : '▶ Run'}
+                </button>
+                <button
+                    type="button" // 防止触发意外的页面重载
+                    onClick={onStop}
+                    disabled={!isRunning}
+                    className={`px-4 py-2 rounded transition-colors font-medium shadow-lg
+                        ${!isRunning
+                            ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                            : 'bg-red-600 hover:bg-red-700 text-white shadow-red-900/20'}`}
+                >
+                    ⏹ Stop
                 </button>
             </div>
         </aside>

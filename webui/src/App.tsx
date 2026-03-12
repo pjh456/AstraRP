@@ -92,6 +92,7 @@ export default function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initEdges);
   const [selectedNode, setSelectedNode] = useState<AppNode | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 引用缓冲，用于积累文本，避免高频 React 渲染卡顿
   const outputBuffer = useRef('');
@@ -147,6 +148,7 @@ export default function App() {
   };
 
   // 模拟从 C++ / Node.js 服务器不断推来 Token
+  /*
   useEffect(() => {
     const mockText = "Hello! I am Astra RP. This is a streaming token test with cyber-edge animation effect. Everything looks perfect.";
     let i = 0;
@@ -163,6 +165,7 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, []);
+  */
 
   const onConnect = (params: Connection) => {
     const newEdge: AppEdge = {
@@ -183,6 +186,7 @@ export default function App() {
   const runPipeline = async () => {
     if (isRunning) return;
     setIsRunning(true);
+    abortControllerRef.current = new AbortController();
 
     // 清空前端缓存与界面状态
     outputBuffer.current = '';
@@ -198,7 +202,8 @@ export default function App() {
       const response = await fetch('http://localhost:3000/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formatStr })
+        body: JSON.stringify({ formatStr }),
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.body) throw new Error("ReadableStream not supported");
@@ -220,23 +225,40 @@ export default function App() {
 
         for (const line of lines) {
           if (!line.trim()) continue;
-          const data = JSON.parse(line);
+
+          let data;
+          try {
+            data = JSON.parse(line); // 加入 try-catch 防止报错断开流
+          } catch (parseErr) {
+            console.warn("Skipping invalid JSON chunk:", line);
+            continue;
+          }
 
           if (data.error) {
             console.error("Backend Error:", data.error);
-            alert("Error: " + data.error);
+            alert("Engine Error: " + data.error); // 暴露后台 OOM 等错误给用户
           } else if (data.done) {
             console.log("Pipeline execution finished!");
           } else if (data.text) {
-            // 将真实的 Token 喂给我们的更新函数！
+            // 将真实的 Token 喂给更新函数！
             handleIncomingToken(data.nodeId, data.text);
           }
         }
       }
-    } catch (err) {
-      console.error("Run pipeline failed:", err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log("Pipeline stopped by user");
+      } else {
+        console.error("Run pipeline failed:", err);
+      }
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const stopPipeline = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
   };
 
@@ -245,6 +267,7 @@ export default function App() {
       <Sidebar
         selectedNode={selectedNode}
         onRun={runPipeline}
+        onStop={stopPipeline}
         isRunning={isRunning}
       />
       <div className="flex-1 h-full relative">

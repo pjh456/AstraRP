@@ -121,6 +121,12 @@ namespace astra_rp
             // === 2. 自回归生成循环 ===
             while (true)
             {
+                if (m_abort_flag && m_abort_flag->load())
+                {
+                    ASTRA_LOG_WARN("Inference aborted by user.");
+                    break;
+                }
+
                 // 结束条件检查：达到了用户的 max_tokens 上限
                 if (m_config.max_tokens > 0 && generated_count >= m_config.max_tokens)
                     break;

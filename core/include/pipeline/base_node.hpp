@@ -23,6 +23,8 @@ namespace astra_rp
             HashMap<Str, NodePayload> m_inputs;
             NodePayload m_output;
 
+            std::atomic<bool> *m_abort_flag = nullptr; // 指向外部的中断信号
+
         public:
             BaseNode(const Str &id, MulPtr<EventBus> bus)
                 : m_id(id), m_bus(bus) {}
@@ -41,6 +43,8 @@ namespace astra_rp
             {
                 m_inputs[parent_id] = payload;
             }
+
+            void set_abort_flag(std::atomic<bool> *flag) { m_abort_flag = flag; }
 
             virtual ResultV<void> execute() = 0;
 

@@ -27,7 +27,7 @@ namespace astra_rp
             std::condition_variable m_cv;
 
             int m_active_tasks = 0;
-            bool m_stop = false;
+            std::atomic<bool> m_stop{false}; // 保证线程安全
 
             Vec<std::thread> m_workers;
             int m_max_concurrency;
@@ -47,6 +47,13 @@ namespace astra_rp
             ~Scheduler();
 
             ResultV<void> run();
+
+            // 强行停止调度器
+            void stop()
+            {
+                m_stop.store(true);
+                m_cv.notify_all();
+            }
 
         private:
             ResultV<void> worker_thread();
