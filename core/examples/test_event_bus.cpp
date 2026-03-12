@@ -45,6 +45,46 @@ void test_basic_pubsub()
 }
 
 // ---------------------------------------------------------
+// 测试 1.5: 模板化接口订阅与发布
+// ---------------------------------------------------------
+void test_template_pubsub()
+{
+    auto bus = MulPtr<EventBus>(new EventBus());
+
+    int token_calls = 0;
+    int state_calls = 0;
+    int error_calls = 0;
+
+    bus->subscribe<EventBus::TokenEvent>([&](const Str &node_id, const Str &token)
+                                         {
+        assert(node_id == "NodeC");
+        assert(token == "Template Hello");
+        token_calls++; });
+
+    bus->subscribe<EventBus::StateEvent>([&](const Str &node_id, NodeState state)
+                                         {
+        assert(node_id == "NodeD");
+        assert(state == NodeState::READY);
+        state_calls++; });
+
+    bus->subscribe<EventBus::ErrorEvent>([&](const Str &node_id, utils::Error err)
+                                         {
+        assert(node_id == "NodeE");
+        assert(err.code == 42);
+        error_calls++; });
+
+    bus->publish(EventBus::TokenEvent{"NodeC", "Template Hello"});
+    bus->publish(EventBus::StateEvent{"NodeD", NodeState::READY});
+    bus->publish(EventBus::ErrorEvent{"NodeE", utils::Error(42, "template error")});
+
+    assert(token_calls == 1);
+    assert(state_calls == 1);
+    assert(error_calls == 1);
+
+    ASTRA_LOG_INFO("Template Pub/Sub functionality verified.");
+}
+
+// ---------------------------------------------------------
 // 测试 2: 多线程并发发布安全
 // ---------------------------------------------------------
 void test_thread_safety()
@@ -97,6 +137,7 @@ int main()
     try
     {
         test_basic_pubsub();
+        test_template_pubsub();
         test_thread_safety();
     }
     catch (const std::exception &e)
