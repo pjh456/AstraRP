@@ -3,6 +3,7 @@ import {
   ReactFlow,
   Controls,
   Background,
+  ConnectionMode,
   useNodesState,
   useEdgesState,
   addEdge
@@ -181,8 +182,16 @@ export default function App() {
   }, []);
   */
 
+  const isValidConnection = (connection: Connection) => {
+    if (isRunning) return false;
+    if (!connection.source || !connection.target) return false;
+    if (connection.source === connection.target) return false;
+
+    return !edges.some((edge) => edge.source === connection.source && edge.target === connection.target);
+  };
+
   const onConnect = (params: Connection) => {
-    if (isRunning) return;
+    if (!isValidConnection(params)) return;
 
     const newEdge: AppEdge = {
       ...params,
@@ -342,6 +351,9 @@ export default function App() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          isValidConnection={isValidConnection}
+          nodesConnectable={!isRunning}
+          connectionMode={ConnectionMode.Strict}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes} // [应用自定义连线]
           onSelectionChange={handleSelectionChange}
@@ -356,6 +368,12 @@ export default function App() {
           <Background color="#374151" />
           <Controls />
         </ReactFlow>
+
+        {!isRunning && (
+          <div className="absolute bottom-4 left-4 text-xs text-gray-400 bg-gray-900/80 border border-gray-700 rounded px-3 py-2">
+            左键从节点右侧小圆点拖拽到另一个节点左侧小圆点即可连边，连不上会自动取消。
+          </div>
+        )}
 
         {contextMenu && (
           <div
