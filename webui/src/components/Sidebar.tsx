@@ -19,6 +19,14 @@ interface SidebarProps {
     isRunning: boolean;
 }
 
+const toEditableNodeData = (data: Record<string, unknown> | undefined): Record<string, string | number> => {
+    if (!data) return {};
+
+    return Object.fromEntries(
+        Object.entries(data).filter(([, value]) => typeof value === 'string' || typeof value === 'number')
+    ) as Record<string, string | number>;
+};
+
 function MultiSelectionEditor({ selectedNodeCount, selectedEdgeCount, onCopySelection, onDeleteSelection, isRunning }: Pick<SidebarProps, 'selectedNodeCount' | 'selectedEdgeCount' | 'onCopySelection' | 'onDeleteSelection' | 'isRunning'>) {
     return (
         <div className="space-y-4">
@@ -47,17 +55,18 @@ function MultiSelectionEditor({ selectedNodeCount, selectedEdgeCount, onCopySele
 }
 
 function NodePropertyEditor({ selectedNode, onDeleteNode, onSaveNode, onCopyNode, isRunning }: Pick<SidebarProps, 'selectedNode' | 'onDeleteNode' | 'onSaveNode' | 'onCopyNode' | 'isRunning'>) {
-    const [draftData, setDraftData] = useState<Record<string, string | number>>((selectedNode?.data as Record<string, string | number>) || {});
+    const editableNodeData = toEditableNodeData(selectedNode?.data as Record<string, unknown> | undefined);
+    const [draftData, setDraftData] = useState<Record<string, string | number>>(editableNodeData);
 
     if (!selectedNode) return null;
 
     const handleInputChange = (key: string, value: string) => {
-        const originalValue = selectedNode.data?.[key];
+        const originalValue = editableNodeData[key];
         const parsedValue = typeof originalValue === 'number' ? Number(value) : value;
         setDraftData((prev) => ({ ...prev, [key]: parsedValue }));
     };
 
-    const hasChanges = JSON.stringify(selectedNode.data) !== JSON.stringify(draftData);
+    const hasChanges = JSON.stringify(editableNodeData) !== JSON.stringify(draftData);
 
     return (
         <div className="space-y-4">

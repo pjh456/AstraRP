@@ -171,8 +171,14 @@ function AppCanvas() {
     const emittingNode = nodeById.get(nodeId);
     if (!emittingNode) return;
 
-    if (tokenRoutingMode.current === 'unknown') {
-      tokenRoutingMode.current = emittingNode.type === 'outputNode' ? 'outputEmits' : 'inferOnly';
+    let switchedToOutputMode = false;
+
+    if (emittingNode.type === 'outputNode' && tokenRoutingMode.current !== 'outputEmits') {
+      tokenRoutingMode.current = 'outputEmits';
+      outputBuffers.current = {};
+      switchedToOutputMode = true;
+    } else if (tokenRoutingMode.current === 'unknown') {
+      tokenRoutingMode.current = 'inferOnly';
     }
 
     const shouldPropagateThroughOutputs =
@@ -233,9 +239,12 @@ function AppCanvas() {
 
     setNodes((nds) =>
       nds.map((node) => {
+        const baseText = switchedToOutputMode && node.type === 'outputNode'
+          ? ''
+          : (outputBuffers.current[node.id] ?? '');
         const increment = outputIncrements.get(node.id) ?? 0;
-        if (increment > 0 && node.type === 'outputNode') {
-          const nextText = `${outputBuffers.current[node.id] ?? ''}${char.repeat(increment)}`;
+        if (node.type === 'outputNode' && (increment > 0 || switchedToOutputMode)) {
+          const nextText = increment > 0 ? `${baseText}${char.repeat(increment)}` : baseText;
           outputBuffers.current[node.id] = nextText;
           const data = node.data as OutputNodeData & { onClear?: (id: string) => void };
 
