@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const WebSocket = require('ws');
 
 // 引入 C++ 引擎
 const astra = require('./build/Release/astrarp_node.node');
@@ -9,8 +11,37 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 创建 HTTP 服务器以便挂载 WebSocket
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server, path: '/api/logs' });
+
+// 设置全局 WS 客户端集合
+const logClients = new Set();
+
+wss.on('connection', (ws) => {
+    logClients.add(ws);
+    ws.on('close', () => logClients.delete(ws));
+});
+
+
 // 1. 初始化 C++ 引擎全局状态
 try {
+    const levelMap = { 0: 'DEBUG', 1: 'INFO', 2: 'WARN', 3: 'ERROR', 4: 'FATAL' };
+    astra.setLogCallback((levelNum, file, line, msg) => {
+        const level = levelMap[levelNum] || 'UNKNOWN';
+        const logEntry = JSON.stringify({
+            timestamp: new Date().toLocaleTimeString(),
+            level, file, line, msg
+        });
+        // 通过 WebSocket 广播给所有连上的前端客户端
+        for (const client of logClients) {
+            // 确保连接处于打开状态才发送，避免阻塞报错
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(logEntry);
+            }
+        }
+    });
+
     const configPath = path.resolve("./config.json");
     console.log("Initializing Astra Engine with:", configPath);
     astra.initSystem(configPath);
@@ -60,6 +91,6 @@ app.post('/api/run', (req, res) => {
     });
 });
 
-app.listen(3000, () => {
+server.listen(3000, () => {
     console.log('Astra Bridge Server is running on http://localhost:3000');
 });

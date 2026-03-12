@@ -19,6 +19,7 @@ import InferenceNode from './nodes/InferenceNode';
 import FormatNode from './nodes/FormatNode';
 import OutputNode from './nodes/OutputNode';
 import Sidebar from './components/Sidebar';
+import LogSidebar from './components/LogSidebar';
 import TokenEdge from './edges/TokenEdge';
 
 type FormatNodeData = {
@@ -263,6 +264,7 @@ export default function App() {
           <Controls />
         </ReactFlow>
       </div>
+      <LogSidebar />
     </div>
   );
 }
