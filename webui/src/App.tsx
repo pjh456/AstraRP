@@ -160,29 +160,12 @@ function AppCanvas() {
   const isMultiSelection = selectedNodes.length + selectedEdges.length > 1;
 
   const handleIncomingToken = (nodeId: string, char: string) => {
-    const adjacency = new Map<string, string[]>();
-    for (const edge of edges) {
-      if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
-      adjacency.get(edge.source)?.push(edge.target);
-    }
-
+    const emittingNode = nodes.find((node) => node.id === nodeId);
     const reachableOutputIds = new Set<string>();
-    const queue = [nodeId];
-    const visited = new Set<string>();
 
-    while (queue.length > 0) {
-      const current = queue.shift() as string;
-      if (visited.has(current)) continue;
-      visited.add(current);
-
-      const currentNode = nodes.find((node) => node.id === current);
-      if (currentNode?.type === 'outputNode') {
-        reachableOutputIds.add(current);
-      }
-
-      for (const next of adjacency.get(current) ?? []) {
-        if (!visited.has(next)) queue.push(next);
-      }
+    // 只把文本写入“当前发出 token 的 output 节点”，避免 infer/output 双重回调造成重复累积。
+    if (emittingNode?.type === 'outputNode') {
+      reachableOutputIds.add(nodeId);
     }
 
     setNodes((nds) =>
@@ -277,6 +260,10 @@ function AppCanvas() {
     const nodeSet = new Set(nodeIds);
     const edgeSet = new Set(edgeIds);
 
+    for (const nodeId of nodeSet) {
+      delete outputBuffers.current[nodeId];
+    }
+
     setNodes((nds) => nds.filter((node) => !nodeSet.has(node.id)));
     setEdges((eds) =>
       eds.filter((edge) => !edgeSet.has(edge.id) && !nodeSet.has(edge.source) && !nodeSet.has(edge.target))
@@ -309,6 +296,11 @@ function AppCanvas() {
       data: nextData,
       selected: true
     } as AppNode;
+
+    if (currentNode.type === 'outputNode') {
+      outputBuffers.current[newNodeId] = outputBuffers.current[nodeId] ?? '';
+      delete outputBuffers.current[nodeId];
+    }
 
     setNodes((nds) => nds.map((node) => (node.id === nodeId ? recreatedNode : { ...node, selected: false })));
     setEdges((eds) =>
@@ -345,7 +337,10 @@ function AppCanvas() {
       ...currentNode,
       id: copyId,
       selected: true,
-      position: { x: currentNode.position.x + 40, y: currentNode.position.y + 40 }
+      position: { x: currentNode.position.x + 40, y: currentNode.position.y + 40 },
+      data: currentNode.type === 'outputNode'
+        ? { text: '' }
+        : currentNode.data
     } as AppNode;
 
     setNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), copiedNode]);
@@ -367,7 +362,10 @@ function AppCanvas() {
         ...node,
         id: newId,
         selected: true,
-        position: { x: node.position.x + 40, y: node.position.y + 40 }
+        position: { x: node.position.x + 40, y: node.position.y + 40 },
+        data: node.type === 'outputNode'
+          ? { text: '' }
+          : node.data
       } as AppNode;
     });
 
