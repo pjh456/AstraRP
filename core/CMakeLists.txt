@@ -6,6 +6,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# ================= 构建控制开关 =================
+# 默认关闭 LTO，以大幅度提升日常编译和链接速度。发布正式版时可开启。
+option(ASTRARP_ENABLE_LTO "Enable Link Time Optimization (LTO)" OFF)
+
+# 默认关闭 examples 测试集构建，如果只是为了给 Node.js 编译 addon 根本不需要编这些
+option(ASTRARP_BUILD_EXAMPLES "Build AstraRP examples" OFF)
+
+# =================================================
+
 # 2. CPU 指令集优化：开启高度优化并启用原生指令集 (AVX2/AVX512等)
 if(MSVC)
     add_compile_options(
@@ -19,30 +28,36 @@ if(MSVC)
     # Windows / MSVC 优化
     add_compile_options(
         $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Release>:/GL>
         $<$<CONFIG:Release>:/arch:AVX2>
 
         $<$<CONFIG:RelWithDebInfo>:/O2>
-        $<$<CONFIG:RelWithDebInfo>:/GL>
         $<$<CONFIG:RelWithDebInfo>:/arch:AVX2>
     ) # 开启 O2 优化、全局优化和 AVX2
-    add_link_options(
-        $<$<CONFIG:Release>:/LTCG>
-        $<$<CONFIG:RelWithDebInfo>:/LTCG>
-    ) # 开启链接时代码生成
+
+    # 只有开启 LTO 开关时，才应用导致链接巨慢的全局优化选项
+    if(ASTRARP_ENABLE_LTO)
+        add_compile_options(
+            $<$<CONFIG:Release>:/GL>
+            $<$<CONFIG:RelWithDebInfo>:/GL>
+        )
+        add_link_options(
+            $<$<CONFIG:Release>:/LTCG>
+            $<$<CONFIG:RelWithDebInfo>:/LTCG>
+        )
+    endif()
 else()
+    # Linux / macOS (GCC/Clang) 优化
     add_link_options(
         -static-libgcc
         -static-libstdc++
         -static)
 
-    # Linux / macOS (GCC/Clang) 优化
-    # -O3: 最高级优化
-    # -march=native: 让编译器针对你当前的 CPU 指令集进行全速优化
-    # -flto: 开启链接时优化，减小体积并提升跨文件调用性能
-    # add_compile_options(-O3 -march=native -mtune=native -flto=auto)
-    # add_link_options(-flto)
     add_compile_options(-O2 -march=native -mtune=native)
+
+    if(ASTRARP_ENABLE_LTO)
+        add_compile_options(-flto=auto)
+        add_link_options(-flto)
+    endif()
 endif()
 
 # 3. 引入 llama.cpp 目录并开启内部优化开关
@@ -98,7 +113,7 @@ file(GLOB_RECURSE ASTRARP_SOURCES
     src/*.cpp
 )
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/pjh_json")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/pjh_json/include/pjh_json")
 
 # 创建一个静态库，方便 examples 链接
 add_library(astrarp_lib STATIC ${ASTRARP_SOURCES} ${ASTRARP_HEADERS})
@@ -108,7 +123,7 @@ target_include_directories(astrarp_lib PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/pjh_json/include")
 
-target_link_libraries(astrarp_lib PUBLIC llama pjh_json benchmark::benchmark)
+target_link_libraries(astrarp_lib PUBLIC llama pjh_json)
 
 add_executable(astra src/main.cpp)
 target_link_libraries(astra PRIVATE astrarp_lib)
@@ -118,34 +133,38 @@ add_custom_command(TARGET astra POST_BUILD
     $<TARGET_FILE:llama>
     $<TARGET_FILE_DIR:astra>
 )
-enable_testing()
 
-# 查找 examples 目录下所有的 cpp 文件
-file(GLOB EXAMPLE_SOURCES "examples/*.cpp")
+# ================= 按需构建 Examples =================
+if(ASTRARP_BUILD_EXAMPLES)
+    enable_testing()
 
-foreach(SOURCE_FILE ${EXAMPLE_SOURCES})
-    # 获取文件名（不带后缀）作为 Target 名称
-    get_filename_component(EXAMPLE_NAME ${SOURCE_FILE} NAME_WE)
+    # 查找 examples 目录下所有的 cpp 文件
+    file(GLOB EXAMPLE_SOURCES "examples/*.cpp")
 
-    # 定义 Target 名字
-    set(TARGET_NAME "${EXAMPLE_NAME}")
+    foreach(SOURCE_FILE ${EXAMPLE_SOURCES})
+        # 获取文件名（不带后缀）作为 Target 名称
+        get_filename_component(EXAMPLE_NAME ${SOURCE_FILE} NAME_WE)
 
-    # 创建可执行程序
-    # 使用 EXCLUDE_FROM_ALL 确保只有在手动构建它们或运行测试时才编译
-    add_executable(${TARGET_NAME} ${SOURCE_FILE})
+        # 定义 Target 名字
+        set(TARGET_NAME "${EXAMPLE_NAME}")
 
-    # 链接到我们的核心库
-    target_link_libraries(${TARGET_NAME} PRIVATE astrarp_lib)
+        # 创建可执行程序
+        # 使用 EXCLUDE_FROM_ALL 确保只有在手动构建它们或运行测试时才编译
+        add_executable(${TARGET_NAME} ${SOURCE_FILE})
 
-    # 重点：仅在 Debug 模式下添加为测试用例
-    # 注意：CMAKE_BUILD_TYPE 在多配置生成器（如 VS）中可能为空，
-    # 这里使用逻辑：如果是 Debug 或者是多配置的 Debug 运行环境
-    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+        # 链接到我们的核心库
+        target_link_libraries(${TARGET_NAME} PRIVATE astrarp_lib)
 
-    # 只在 Debug 模式下才编译这些 example
-    # if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    # set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
-    set_tests_properties(${TARGET_NAME} PROPERTIES ENVIRONMENT "${ENV_LIST}")
+        # 重点：仅在 Debug 模式下添加为测试用例
+        # 注意：CMAKE_BUILD_TYPE 在多配置生成器（如 VS）中可能为空，
+        # 这里使用逻辑：如果是 Debug 或者是多配置的 Debug 运行环境
+        add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
 
-    # endif()
-endforeach()
+        # 只在 Debug 模式下才编译这些 example
+        # if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        # set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+        set_tests_properties(${TARGET_NAME} PROPERTIES ENVIRONMENT "${ENV_LIST}")
+
+        # endif()
+    endforeach()
+endif()
