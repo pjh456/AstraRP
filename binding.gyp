@@ -10,7 +10,8 @@
                 "./core/include",
                 "./core/llama.cpp/ggml/include",
                 "./core/llama.cpp/include",
-                "./core/pjh_json/include"
+                "./core/pjh_json/include",
+                "./core/pjh_json/include/pjh_json"
             ],
             "dependencies": [
                 "<!(node -p \"require('node-addon-api').gyp\")"
@@ -24,7 +25,9 @@
                 "<(module_root_dir)/core/build/Release/llama.lib"
             ],
             "cflags_cc": [
-                "-std=c++20"
+                "-std=c++20",
+                "-O3",
+                "-march=native"
             ],
             "defines": [
                 "NAPI_CPP_EXCEPTIONS",
@@ -32,6 +35,7 @@
             ],
             "msvs_settings": {
                 "VCCLCompilerTool": {
+                    "RuntimeLibrary": 0,
                     "DebugInformationFormat": "0",
                     "ExceptionHandling": 1,
                     "AdditionalOptions": [
