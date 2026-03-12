@@ -10,53 +10,32 @@ namespace astra_rp
 
         void EventBus::subscribe_token(tcb cb)
         {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            m_token_subs.push_back(cb);
+            subscribe<TokenEvent>(std::move(cb));
         }
 
         void EventBus::subscribe_state(scb cb)
         {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            m_state_subs.push_back(cb);
+            subscribe<StateEvent>(std::move(cb));
         }
 
         void EventBus::subscribe_error(ecb cb)
         {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            m_error_subs.push_back(cb);
+            subscribe<ErrorEvent>(std::move(cb));
         }
 
         void EventBus::publish_token(const Str &id, const Str &text)
         {
-            Vec<TokenCallback> callbacks;
-            {
-                std::lock_guard<std::mutex> lock(m_mtx);
-                callbacks = m_token_subs;
-            }
-            for (auto &cb : callbacks)
-                cb(id, text);
+            publish(TokenEvent{id, text});
         }
 
         void EventBus::publish_state(const Str &id, NodeState state)
         {
-            Vec<StateCallback> callbacks;
-            {
-                std::lock_guard<std::mutex> lock(m_mtx);
-                callbacks = m_state_subs;
-            }
-            for (auto &cb : callbacks)
-                cb(id, state);
+            publish(StateEvent{id, state});
         }
 
         void EventBus::publish_error(const Str &id, utils::Error err)
         {
-            Vec<ErrorCallback> callbacks;
-            {
-                std::lock_guard<std::mutex> lock(m_mtx);
-                callbacks = m_error_subs;
-            }
-            for (auto &cb : callbacks)
-                cb(id, err);
+            publish(ErrorEvent{id, err});
         }
     }
 }
