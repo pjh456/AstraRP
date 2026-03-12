@@ -12,7 +12,9 @@ import type {
   Node,
   Edge,
   Connection,
-  OnSelectionChangeParams
+  OnSelectionChangeParams,
+  NodeChange,
+  EdgeChange
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -56,8 +58,6 @@ const defaultNodeData: Record<NodeKind, FormatNodeData | InferenceNodeData | Out
   outputNode: { text: '' }
 };
 
-const makeNodeId = (type: NodeKind) => `${type}_${Math.random().toString(36).slice(2, 10)}`;
-
 const initNodes: AppNode[] = [
   {
     id: 'format_1',
@@ -79,13 +79,14 @@ const initNodes: AppNode[] = [
   }
 ];
 
-const initEdges = [
+const initEdges: AppEdge[] = [
   {
     id: 'e1-2',
     source: 'format_1',
     target: 'infer_1',
     type: 'tokenEdge',
     style: { stroke: '#a855f7', strokeWidth: 2, strokeDasharray: '5,5' },
+    animated: false,
     data: { tokens: [] }
   },
   {
@@ -94,19 +95,40 @@ const initEdges = [
     target: 'out_1',
     type: 'tokenEdge',
     style: { stroke: '#22c55e', strokeWidth: 2, strokeDasharray: '5,5' },
+    animated: false,
     data: { tokens: [] }
   }
 ];
 
+const makeNodeId = (base: string, taken: Set<string>) => {
+  let candidate = base;
+  let i = 1;
+  while (taken.has(candidate)) {
+    candidate = `${base}_${i}`;
+    i += 1;
+  }
+  return candidate;
+};
+
+const makeEdgeId = (source: string, target: string, taken: Set<string>) => {
+  const base = `${source}-${target}`;
+  let candidate = base;
+  let i = 1;
+  while (taken.has(candidate)) {
+    candidate = `${base}_${i}`;
+    i += 1;
+  }
+  return candidate;
+};
+
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initEdges);
-  const [selectedNode, setSelectedNode] = useState<AppNode | null>(null);
+  const [selectedNodes, setSelectedNodes] = useState<AppNode[]>([]);
+  const [selectedEdges, setSelectedEdges] = useState<AppEdge[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-
-  // 引用缓冲，用于积累文本，避免高频 React 渲染卡顿
   const outputBuffer = useRef('');
 
   const nodeTypes = useMemo(
@@ -122,6 +144,10 @@ export default function App() {
     []
   );
 
+  const selectedNode = selectedNodes.length === 1 && selectedEdges.length === 0 ? selectedNodes[0] : null;
+  const selectedEdge = selectedEdges.length === 1 && selectedNodes.length === 0 ? selectedEdges[0] : null;
+  const isMultiSelection = selectedNodes.length + selectedEdges.length > 1;
+
   const handleIncomingToken = (nodeId: string, char: string) => {
     outputBuffer.current += char;
 
@@ -135,11 +161,7 @@ export default function App() {
       nds.map((node) => {
         if (targetOutputIds.has(node.id) && node.type === 'outputNode') {
           const data = node.data as OutputNodeData;
-
-          return {
-            ...node,
-            data: { ...data, text: outputBuffer.current }
-          };
+          return { ...node, data: { ...data, text: outputBuffer.current } };
         }
         return node;
       })
@@ -149,55 +171,36 @@ export default function App() {
       eds.map((edge) => {
         if (edge.source === nodeId) {
           const tokens = edge.data?.tokens ?? [];
-
-          return {
-            ...edge,
-            data: {
-              tokens: [...tokens, char]
-            }
-          };
+          return { ...edge, data: { tokens: [...tokens, char] } };
         }
         return edge;
       })
     );
   };
 
-  // 模拟从 C++ / Node.js 服务器不断推来 Token
-  /*
-  useEffect(() => {
-    const mockText = "Hello! I am Astra RP. This is a streaming token test with cyber-edge animation effect. Everything looks perfect.";
-    let i = 0;
-
-    // 每 150ms 模拟收到一个后端吐出的 token
-    const timer = setInterval(() => {
-      if (i < mockText.length) {
-        // 假设这里你调用了 await astra.detokenize('default', [token_id])
-        const char = mockText[i];
-        handleIncomingToken('infer_1', char);
-        i++;
-      }
-    }, 150);
-
-    return () => clearInterval(timer);
-  }, []);
-  */
-
-  const isValidConnection = (connection: Connection) => {
+  const isValidConnection = (connection: Connection | AppEdge) => {
     if (isRunning) return false;
-    if (!connection.source || !connection.target) return false;
-    if (connection.source === connection.target) return false;
-
-    return !edges.some((edge) => edge.source === connection.source && edge.target === connection.target);
+    const source = connection.source ?? null;
+    const target = connection.target ?? null;
+    if (!source || !target) return false;
+    if (source === target) return false;
+    return !edges.some((edge) => edge.source === source && edge.target === target);
   };
 
   const onConnect = (params: Connection) => {
     if (!isValidConnection(params)) return;
 
+    const takenIds = new Set(edges.map((edge) => edge.id));
+    const source = params.source as string;
+    const target = params.target as string;
+
     const newEdge: AppEdge = {
       ...params,
-      id: `${params.source}-${params.target}`,
+      id: makeEdgeId(source, target, takenIds),
+      source,
+      target,
       type: 'tokenEdge',
-      animated: true,
+      animated: false,
       style: { stroke: '#a855f7', strokeWidth: 2 },
       data: { tokens: [] }
     };
@@ -207,8 +210,11 @@ export default function App() {
   const addNodeByContextMenu = (type: NodeKind) => {
     if (!contextMenu || isRunning) return;
 
+    const takenIds = new Set(nodes.map((node) => node.id));
+    const nodeId = makeNodeId(type, takenIds);
+
     const newNode: AppNode = {
-      id: makeNodeId(type),
+      id: nodeId,
       type,
       position: { x: contextMenu.x, y: contextMenu.y },
       data: structuredClone(defaultNodeData[type])
@@ -218,12 +224,24 @@ export default function App() {
     setContextMenu(null);
   };
 
-  const deleteNode = (nodeId: string) => {
+  const deleteNodesAndEdges = (nodeIds: string[], edgeIds: string[]) => {
     if (isRunning) return;
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
-    setSelectedNode(null);
+
+    const nodeSet = new Set(nodeIds);
+    const edgeSet = new Set(edgeIds);
+
+    setNodes((nds) => nds.filter((node) => !nodeSet.has(node.id)));
+    setEdges((eds) =>
+      eds.filter((edge) => !edgeSet.has(edge.id) && !nodeSet.has(edge.source) && !nodeSet.has(edge.target))
+    );
+
+    setSelectedNodes([]);
+    setSelectedEdges([]);
   };
+
+  const deleteNode = (nodeId: string) => deleteNodesAndEdges([nodeId], []);
+  const deleteEdge = (edgeId: string) => deleteNodesAndEdges([], [edgeId]);
+  const deleteSelection = () => deleteNodesAndEdges(selectedNodes.map((n) => n.id), selectedEdges.map((e) => e.id));
 
   const saveNode = (nodeId: string, nextData: Record<string, string | number>) => {
     if (isRunning) return;
@@ -234,27 +252,123 @@ export default function App() {
     const hasChanges = JSON.stringify(currentNode.data) !== JSON.stringify(nextData);
     if (!hasChanges) return;
 
-    const newNodeId = makeNodeId(currentNode.type as NodeKind);
+    const takenIds = new Set(nodes.map((node) => node.id));
+    takenIds.delete(nodeId);
+    const newNodeId = makeNodeId(`${nodeId}_edit`, takenIds);
+
     const recreatedNode = {
       ...currentNode,
       id: newNodeId,
-      data: nextData
+      data: nextData,
+      selected: true
     } as AppNode;
 
-    setNodes((nds) => nds.map((node) => (node.id === nodeId ? recreatedNode : node)));
+    setNodes((nds) => nds.map((node) => (node.id === nodeId ? recreatedNode : { ...node, selected: false })));
     setEdges((eds) =>
-      eds.map((edge) => ({
-        ...edge,
-        source: edge.source === nodeId ? newNodeId : edge.source,
-        target: edge.target === nodeId ? newNodeId : edge.target,
-        id: `${edge.source === nodeId ? newNodeId : edge.source}-${edge.target === nodeId ? newNodeId : edge.target}`
-      }))
+      eds.map((edge) => {
+        const source = edge.source === nodeId ? newNodeId : edge.source;
+        const target = edge.target === nodeId ? newNodeId : edge.target;
+        return { ...edge, source, target, id: `${source}-${target}` };
+      })
     );
-    setSelectedNode(recreatedNode);
+    setSelectedNodes([recreatedNode]);
+    setSelectedEdges([]);
+  };
+
+  const saveEdge = (edgeId: string, stroke: string) => {
+    if (isRunning) return;
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === edgeId
+          ? { ...edge, style: { ...(edge.style ?? {}), stroke, strokeWidth: 2 } }
+          : edge
+      )
+    );
+  };
+
+  const copySingleNode = (nodeId: string) => {
+    if (isRunning) return;
+    const currentNode = nodes.find((node) => node.id === nodeId);
+    if (!currentNode) return;
+
+    const takenIds = new Set(nodes.map((node) => node.id));
+    const copyId = makeNodeId(`${nodeId}_copy`, takenIds);
+
+    const copiedNode = {
+      ...currentNode,
+      id: copyId,
+      selected: true,
+      position: { x: currentNode.position.x + 40, y: currentNode.position.y + 40 }
+    } as AppNode;
+
+    setNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), copiedNode]);
+    setSelectedNodes([copiedNode]);
+    setSelectedEdges([]);
+  };
+
+  const copySelection = () => {
+    if (isRunning || selectedNodes.length === 0) return;
+
+    const takenNodeIds = new Set(nodes.map((node) => node.id));
+    const idMap = new Map<string, string>();
+
+    const copiedNodes: AppNode[] = selectedNodes.map((node) => {
+      const newId = makeNodeId(`${node.id}_copy`, takenNodeIds);
+      takenNodeIds.add(newId);
+      idMap.set(node.id, newId);
+      return {
+        ...node,
+        id: newId,
+        selected: true,
+        position: { x: node.position.x + 40, y: node.position.y + 40 }
+      } as AppNode;
+    });
+
+    const selectedEdgeSet = new Set(selectedEdges.map((edge) => edge.id));
+    const nodeIdSet = new Set(selectedNodes.map((node) => node.id));
+    const takenEdgeIds = new Set(edges.map((edge) => edge.id));
+
+    const copiedEdges: AppEdge[] = edges
+      .filter(
+        (edge) =>
+          selectedEdgeSet.has(edge.id) &&
+          nodeIdSet.has(edge.source) &&
+          nodeIdSet.has(edge.target)
+      )
+      .map((edge) => {
+        const newSource = idMap.get(edge.source) as string;
+        const newTarget = idMap.get(edge.target) as string;
+        const newId = makeEdgeId(newSource, newTarget, takenEdgeIds);
+        takenEdgeIds.add(newId);
+
+        return {
+          ...edge,
+          id: newId,
+          source: newSource,
+          target: newTarget,
+          selected: true,
+          animated: false,
+          data: { tokens: [] }
+        };
+      });
+
+    setNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), ...copiedNodes]);
+    setEdges((eds) => [...eds.map((edge) => ({ ...edge, selected: false })), ...copiedEdges]);
+    setSelectedNodes(copiedNodes);
+    setSelectedEdges(copiedEdges);
   };
 
   const handleSelectionChange = (params: OnSelectionChangeParams) => {
-    setSelectedNode(params.nodes?.[0] as AppNode || null);
+    setSelectedNodes((params.nodes ?? []) as AppNode[]);
+    setSelectedEdges((params.edges ?? []) as AppEdge[]);
+  };
+
+  const handleNodesChange = (changes: NodeChange<AppNode>[]) => {
+    onNodesChange(changes);
+  };
+
+  const handleEdgesChange = (changes: EdgeChange<AppEdge>[]) => {
+    onEdgesChange(changes);
   };
 
   const runPipeline = async () => {
@@ -264,13 +378,12 @@ export default function App() {
 
     outputBuffer.current = '';
     setNodes((nds) => nds.map((n) => (n.type === 'outputNode' ? { ...n, data: { text: '' } } : n)));
-    setEdges((eds) => eds.map(e => ({ ...e, data: { tokens: [] } })));
+    setEdges((eds) => eds.map((e) => ({ ...e, animated: true, data: { tokens: [] } })));
 
     try {
-      const formatNode = nodes.find(n => n.type === 'formatNode') as Node<FormatNodeData>;
-      const formatStr = formatNode?.data?.formatStr || "User: Hello\nAssistant:";
+      const formatNode = nodes.find((n) => n.type === 'formatNode') as Node<FormatNodeData>;
+      const formatStr = formatNode?.data?.formatStr || 'User: Hello\nAssistant:';
 
-      // 向我们刚才写的 Node.js 桥接服务器发起请求
       const response = await fetch('http://localhost:3000/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,12 +391,11 @@ export default function App() {
         signal: abortControllerRef.current.signal
       });
 
-      if (!response.body) throw new Error("ReadableStream not supported");
+      if (!response.body) throw new Error('ReadableStream not supported');
 
-      // 处理流式响应 (NDJSON 解析)
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
-      let chunkBuffer = ''; // 用于处理被截断的 JSON 行
+      let chunkBuffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -291,8 +403,6 @@ export default function App() {
 
         chunkBuffer += decoder.decode(value, { stream: true });
         const lines = chunkBuffer.split('\n');
-
-        // 留着最后一行（可能是不完整的 JSON）到下个循环处理
         chunkBuffer = lines.pop() || '';
 
         for (const line of lines) {
@@ -300,31 +410,31 @@ export default function App() {
 
           let data;
           try {
-            data = JSON.parse(line); // 加入 try-catch 防止报错断开流
+            data = JSON.parse(line);
           } catch {
-            console.warn("Skipping invalid JSON chunk:", line);
+            console.warn('Skipping invalid JSON chunk:', line);
             continue;
           }
 
           if (data.error) {
-            console.error("Backend Error:", data.error);
-            alert("Engine Error: " + data.error); // 暴露后台 OOM 等错误给用户
+            console.error('Backend Error:', data.error);
+            alert('Engine Error: ' + data.error);
           } else if (data.done) {
-            console.log("Pipeline execution finished!");
+            console.log('Pipeline execution finished!');
           } else if (data.text) {
-            // 将真实的 Token 喂给更新函数！
             handleIncomingToken(data.nodeId, data.text);
           }
         }
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
-        console.log("Pipeline stopped by user");
+        console.log('Pipeline stopped by user');
       } else {
-        console.error("Run pipeline failed:", err);
+        console.error('Run pipeline failed:', err);
       }
     } finally {
       setIsRunning(false);
+      setEdges((eds) => eds.map((e) => ({ ...e, animated: false })));
     }
   };
 
@@ -338,8 +448,17 @@ export default function App() {
     <div className="flex bg-gray-900" style={{ width: '100vw', height: '100vh' }}>
       <Sidebar
         selectedNode={selectedNode}
+        selectedEdge={selectedEdge}
+        selectedNodeCount={selectedNodes.length}
+        selectedEdgeCount={selectedEdges.length}
+        isMultiSelection={isMultiSelection}
         onDeleteNode={deleteNode}
+        onDeleteEdge={deleteEdge}
+        onDeleteSelection={deleteSelection}
         onSaveNode={saveNode}
+        onSaveEdge={saveEdge}
+        onCopyNode={copySingleNode}
+        onCopySelection={copySelection}
         onRun={runPipeline}
         onStop={stopPipeline}
         isRunning={isRunning}
@@ -348,14 +467,16 @@ export default function App() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           isValidConnection={isValidConnection}
           nodesConnectable={!isRunning}
           connectionMode={ConnectionMode.Strict}
+          deleteKeyCode={isRunning ? null : ['Delete', 'Backspace']}
+          multiSelectionKeyCode="Shift"
           nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes} // [应用自定义连线]
+          edgeTypes={edgeTypes}
           onSelectionChange={handleSelectionChange}
           onPaneContextMenu={(event) => {
             event.preventDefault();
@@ -371,7 +492,7 @@ export default function App() {
 
         {!isRunning && (
           <div className="absolute bottom-4 left-4 text-xs text-gray-400 bg-gray-900/80 border border-gray-700 rounded px-3 py-2">
-            左键从节点右侧小圆点拖拽到另一个节点左侧小圆点即可连边，连不上会自动取消。
+            左键从节点右侧小圆点拖到目标左侧小圆点连边；按 Shift 可多选，按 Delete 可删节点/边。
           </div>
         )}
 

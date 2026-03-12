@@ -2,7 +2,6 @@ import { BaseEdge, getBezierPath } from '@xyflow/react';
 import type { EdgeProps } from '@xyflow/react';
 
 export default function TokenEdge({
-    id,
     sourceX,
     sourceY,
     targetX,
@@ -23,7 +22,7 @@ export default function TokenEdge({
         targetPosition
     });
 
-    const tokens = data?.tokens ?? [];
+    const tokens = (data as { tokens?: string[] } | undefined)?.tokens ?? [];
 
     return (
         <>
