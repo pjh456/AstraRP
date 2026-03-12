@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -54,6 +54,12 @@ type AppEdge = Edge<TokenEdgeData>;
 
 type NodeKind = 'formatNode' | 'inferenceNode' | 'outputNode';
 
+const nodePrefix: Record<NodeKind, string> = {
+  formatNode: 'format',
+  inferenceNode: 'infer',
+  outputNode: 'out'
+};
+
 const defaultNodeData: Record<NodeKind, FormatNodeData | InferenceNodeData | OutputNodeData> = {
   formatNode: { formatStr: 'User: Hello\\nAssistant:' },
   inferenceNode: { model: 'qwen2.5-0.5b', maxTokens: 150, temperature: 0.7 },
@@ -102,12 +108,13 @@ const initEdges: AppEdge[] = [
   }
 ];
 
-const makeNodeId = (base: string, taken: Set<string>) => {
-  let candidate = base;
+const makeNodeId = (kind: NodeKind, taken: Set<string>, suffix = '') => {
+  const base = `${nodePrefix[kind]}_`;
   let i = 1;
+  let candidate = `${base}${i}${suffix}`;
   while (taken.has(candidate)) {
-    candidate = `${base}_${i}`;
     i += 1;
+    candidate = `${base}${i}${suffix}`;
   }
   return candidate;
 };
@@ -133,7 +140,7 @@ function AppCanvas() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition } = useReactFlow<AppNode, AppEdge>();
-  const outputBuffer = useRef('');
+  const outputBuffers = useRef<Record<string, string>>({});
 
   const nodeTypes = useMemo(
     () => ({
@@ -153,19 +160,42 @@ function AppCanvas() {
   const isMultiSelection = selectedNodes.length + selectedEdges.length > 1;
 
   const handleIncomingToken = (nodeId: string, char: string) => {
-    outputBuffer.current += char;
+    const adjacency = new Map<string, string[]>();
+    for (const edge of edges) {
+      if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
+      adjacency.get(edge.source)?.push(edge.target);
+    }
 
-    const targetOutputIds = new Set(
-      edges
-        .filter((edge) => edge.source === nodeId)
-        .map((edge) => edge.target)
-    );
+    const reachableOutputIds = new Set<string>();
+    const queue = [nodeId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+      const current = queue.shift() as string;
+      if (visited.has(current)) continue;
+      visited.add(current);
+
+      const currentNode = nodes.find((node) => node.id === current);
+      if (currentNode?.type === 'outputNode') {
+        reachableOutputIds.add(current);
+      }
+
+      for (const next of adjacency.get(current) ?? []) {
+        if (!visited.has(next)) queue.push(next);
+      }
+    }
 
     setNodes((nds) =>
       nds.map((node) => {
-        if (targetOutputIds.has(node.id) && node.type === 'outputNode') {
-          const data = node.data as OutputNodeData;
-          return { ...node, data: { ...data, text: outputBuffer.current } };
+        if (reachableOutputIds.has(node.id) && node.type === 'outputNode') {
+          const nextText = `${outputBuffers.current[node.id] ?? ''}${char}`;
+          outputBuffers.current[node.id] = nextText;
+          const data = node.data as OutputNodeData & { onClear?: (id: string) => void };
+
+          return {
+            ...node,
+            data: { ...data, text: nextText }
+          };
         }
         return node;
       })
@@ -228,6 +258,19 @@ function AppCanvas() {
     setContextMenu(null);
   };
 
+
+  const clearOutputContent = useCallback((nodeId: string) => {
+    if (isRunning) return;
+    outputBuffers.current[nodeId] = '';
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId && node.type === 'outputNode'
+          ? { ...node, data: { ...(node.data as OutputNodeData), text: '' } }
+          : node
+      )
+    );
+  }, [isRunning, setNodes]);
+
   const deleteNodesAndEdges = (nodeIds: string[], edgeIds: string[]) => {
     if (isRunning) return;
 
@@ -258,7 +301,7 @@ function AppCanvas() {
 
     const takenIds = new Set(nodes.map((node) => node.id));
     takenIds.delete(nodeId);
-    const newNodeId = makeNodeId(`${nodeId}_edit`, takenIds);
+    const newNodeId = makeNodeId(currentNode.type as NodeKind, takenIds, '_edit');
 
     const recreatedNode = {
       ...currentNode,
@@ -296,7 +339,7 @@ function AppCanvas() {
     if (!currentNode) return;
 
     const takenIds = new Set(nodes.map((node) => node.id));
-    const copyId = makeNodeId(`${nodeId}_copy`, takenIds);
+    const copyId = makeNodeId(currentNode.type as NodeKind, takenIds, '_copy');
 
     const copiedNode = {
       ...currentNode,
@@ -317,7 +360,7 @@ function AppCanvas() {
     const idMap = new Map<string, string>();
 
     const copiedNodes: AppNode[] = selectedNodes.map((node) => {
-      const newId = makeNodeId(`${node.id}_copy`, takenNodeIds);
+      const newId = makeNodeId(node.type as NodeKind, takenNodeIds, '_copy');
       takenNodeIds.add(newId);
       idMap.set(node.id, newId);
       return {
@@ -381,18 +424,18 @@ function AppCanvas() {
     setIsRunning(true);
     abortControllerRef.current = new AbortController();
 
-    outputBuffer.current = '';
-    setNodes((nds) => nds.map((n) => (n.type === 'outputNode' ? { ...n, data: { text: '' } } : n)));
+    outputBuffers.current = {};
+    setNodes((nds) => nds.map((n) => (n.type === 'outputNode' ? { ...n, data: { ...(n.data as OutputNodeData), text: '' } } : n)));
     setEdges((eds) => eds.map((e) => ({ ...e, animated: true, style: { ...(e.style ?? {}), strokeDasharray: '5,5' }, data: { tokens: [] } })));
 
     try {
-      const formatNode = nodes.find((n) => n.type === 'formatNode') as Node<FormatNodeData>;
-      const formatStr = formatNode?.data?.formatStr || 'User: Hello\nAssistant:';
-
       const response = await fetch('http://localhost:3000/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formatStr }),
+        body: JSON.stringify({
+          nodes: nodes.map((node) => ({ id: node.id, type: node.type, data: node.data })),
+          edges: edges.map((edge) => ({ source: edge.source, target: edge.target }))
+        }),
         signal: abortControllerRef.current.signal
       });
 
@@ -443,6 +486,23 @@ function AppCanvas() {
     }
   };
 
+
+  const renderNodes = useMemo(
+    () =>
+      nodes.map((node) =>
+        node.type === 'outputNode'
+          ? {
+              ...node,
+              data: {
+                ...(node.data as OutputNodeData),
+                onClear: clearOutputContent
+              }
+            }
+          : node
+      ) as AppNode[],
+    [nodes, clearOutputContent]
+  );
+
   const stopPipeline = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -470,7 +530,7 @@ function AppCanvas() {
       />
       <div ref={paneRef} className="flex-1 h-full relative" onClick={() => setContextMenu(null)}>
         <ReactFlow
-          nodes={nodes}
+          nodes={renderNodes}
           edges={edges}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}

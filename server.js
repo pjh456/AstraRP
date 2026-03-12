@@ -53,7 +53,7 @@ try {
 
 // 2. 提供流式推理 API
 app.post('/api/run', (req, res) => {
-    const { formatStr } = req.body;
+    const { nodes = [], edges = [] } = req.body || {};
 
     // 明确写入流式协议头，关闭缓存，并防止 Express 内部自动干扰
     res.writeHead(200, {
@@ -69,13 +69,36 @@ app.post('/api/run', (req, res) => {
 
     // 放入 try-catch 防止显存 OOM 导致服务器崩溃
     try {
-        // 根据前端传来的参数构建 DAG (暂时硬编码图结构，参数动态化)
-        pipeline.addFormatNode("format_1", formatStr || "User: Hello\nAssistant:");
-        pipeline.addInferenceNode("infer_1");
-        pipeline.addOutputNode("out_1");
+        if (!Array.isArray(nodes) || nodes.length === 0) {
+            throw new Error('Invalid graph: nodes is required.');
+        }
 
-        pipeline.addEdge("format_1", "infer_1");
-        pipeline.addEdge("infer_1", "out_1");
+        const nodeIds = new Set();
+
+        for (const node of nodes) {
+            if (!node?.id || !node?.type) {
+                throw new Error('Invalid node entry in graph payload.');
+            }
+            if (nodeIds.has(node.id)) {
+                throw new Error(`Duplicate node id: ${node.id}`);
+            }
+            nodeIds.add(node.id);
+
+            if (node.type === 'formatNode') {
+                const prompt = node?.data?.formatStr || 'User: Hello\nAssistant:';
+                pipeline.addFormatNode(node.id, String(prompt));
+            } else if (node.type === 'inferenceNode') {
+                pipeline.addInferenceNode(node.id);
+            } else if (node.type === 'outputNode') {
+                pipeline.addOutputNode(node.id);
+            }
+        }
+
+        for (const edge of edges) {
+            if (!edge?.source || !edge?.target) continue;
+            if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue;
+            pipeline.addEdge(edge.source, edge.target);
+        }
     } catch (e) {
         console.error("Pipeline initialization failed (Likely OOM):", e);
         res.write(JSON.stringify({ error: e.message }) + '\n');
