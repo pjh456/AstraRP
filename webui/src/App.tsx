@@ -189,22 +189,27 @@ function AppCanvas() {
 
     const nodePathCount = new Map<string, number>();
     const edgePathCount = new Map<string, number>();
-    nodePathCount.set(nodeId, 1);
 
-    const queue: string[] = [nodeId];
+    const pending = new Map<string, number>();
+    pending.set(nodeId, 1);
+
     let guard = 0;
 
-    while (queue.length > 0 && guard < 10000) {
+    while (pending.size > 0 && guard < 10000) {
       guard += 1;
-      const current = queue.shift() as string;
-      const currentCount = nodePathCount.get(current) ?? 0;
+      const [current, delta] = pending.entries().next().value as [string, number];
+      pending.delete(current);
+      if (delta <= 0) continue;
+
       const currentNode = nodeById.get(current);
-      if (!currentNode || currentCount <= 0) continue;
+      if (!currentNode) continue;
+
+      nodePathCount.set(current, (nodePathCount.get(current) ?? 0) + delta);
 
       const nextNodes = adjacency.get(current) ?? [];
       for (const next of nextNodes) {
         const edgeKey = `${current}->${next}`;
-        edgePathCount.set(edgeKey, (edgePathCount.get(edgeKey) ?? 0) + currentCount);
+        edgePathCount.set(edgeKey, (edgePathCount.get(edgeKey) ?? 0) + delta);
 
         const nextNode = nodeById.get(next);
         if (!nextNode) continue;
@@ -213,8 +218,7 @@ function AppCanvas() {
           continue;
         }
 
-        nodePathCount.set(next, (nodePathCount.get(next) ?? 0) + currentCount);
-        queue.push(next);
+        pending.set(next, (pending.get(next) ?? 0) + delta);
       }
     }
 

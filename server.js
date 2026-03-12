@@ -74,6 +74,7 @@ app.post('/api/run', (req, res) => {
         }
 
         const nodeIds = new Set();
+        const inferenceNodeIds = new Set();
 
         for (const node of nodes) {
             if (!node?.id || !node?.type) {
@@ -89,15 +90,25 @@ app.post('/api/run', (req, res) => {
                 pipeline.addFormatNode(node.id, String(prompt));
             } else if (node.type === 'inferenceNode') {
                 pipeline.addInferenceNode(node.id);
+                inferenceNodeIds.add(node.id);
             } else if (node.type === 'outputNode') {
                 pipeline.addOutputNode(node.id);
             }
         }
 
+        const incomingCount = new Map();
+
         for (const edge of edges) {
             if (!edge?.source || !edge?.target) continue;
             if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue;
             pipeline.addEdge(edge.source, edge.target);
+            incomingCount.set(edge.target, (incomingCount.get(edge.target) || 0) + 1);
+        }
+
+        for (const inferId of inferenceNodeIds) {
+            if ((incomingCount.get(inferId) || 0) === 0) {
+                throw new Error(`Inference node ${inferId} has no upstream input.`);
+            }
         }
     } catch (e) {
         console.error("Pipeline initialization failed (Likely OOM):", e);
