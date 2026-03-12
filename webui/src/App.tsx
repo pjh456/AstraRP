@@ -7,7 +7,8 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
-  useReactFlow
+  useReactFlow,
+  ReactFlowProvider
 } from '@xyflow/react';
 import type {
   Node,
@@ -122,7 +123,7 @@ const makeEdgeId = (source: string, target: string, taken: Set<string>) => {
   return candidate;
 };
 
-export default function App() {
+function AppCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initEdges);
   const [selectedNodes, setSelectedNodes] = useState<AppNode[]>([]);
@@ -520,5 +521,14 @@ export default function App() {
       </div>
       <LogSidebar />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <AppCanvas />
+    </ReactFlowProvider>
   );
 }
