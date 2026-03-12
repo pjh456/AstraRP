@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -47,6 +47,16 @@ type TokenEdgeData = {
 
 type AppEdge = Edge<TokenEdgeData>;
 
+type NodeKind = 'formatNode' | 'inferenceNode' | 'outputNode';
+
+const defaultNodeData: Record<NodeKind, FormatNodeData | InferenceNodeData | OutputNodeData> = {
+  formatNode: { formatStr: 'User: Hello\\nAssistant:' },
+  inferenceNode: { model: 'qwen2.5-0.5b', maxTokens: 150, temperature: 0.7 },
+  outputNode: { text: '' }
+};
+
+const makeNodeId = (type: NodeKind) => `${type}_${Math.random().toString(36).slice(2, 10)}`;
+
 const initNodes: AppNode[] = [
   {
     id: 'format_1',
@@ -93,6 +103,7 @@ export default function App() {
   const [selectedNode, setSelectedNode] = useState<AppNode | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // 引用缓冲，用于积累文本，避免高频 React 渲染卡顿
   const outputBuffer = useRef('');
@@ -111,13 +122,17 @@ export default function App() {
   );
 
   const handleIncomingToken = (nodeId: string, char: string) => {
-    // 1. 累加到缓冲器
     outputBuffer.current += char;
 
-    // 2. 更新 Output 节点显示
+    const targetOutputIds = new Set(
+      edges
+        .filter((edge) => edge.source === nodeId)
+        .map((edge) => edge.target)
+    );
+
     setNodes((nds) =>
       nds.map((node) => {
-        if (node.id === 'out_1') {
+        if (targetOutputIds.has(node.id) && node.type === 'outputNode') {
           const data = node.data as OutputNodeData;
 
           return {
@@ -129,7 +144,6 @@ export default function App() {
       })
     );
 
-    // 3. 触发连线上的 "流光文字" 效果
     setEdges((eds) =>
       eds.map((edge) => {
         if (edge.source === nodeId) {
@@ -168,6 +182,8 @@ export default function App() {
   */
 
   const onConnect = (params: Connection) => {
+    if (isRunning) return;
+
     const newEdge: AppEdge = {
       ...params,
       id: `${params.source}-${params.target}`,
@@ -179,6 +195,55 @@ export default function App() {
     setEdges((eds) => addEdge(newEdge, eds));
   };
 
+  const addNodeByContextMenu = (type: NodeKind) => {
+    if (!contextMenu || isRunning) return;
+
+    const newNode: AppNode = {
+      id: makeNodeId(type),
+      type,
+      position: { x: contextMenu.x, y: contextMenu.y },
+      data: structuredClone(defaultNodeData[type])
+    } as AppNode;
+
+    setNodes((nds) => [...nds, newNode]);
+    setContextMenu(null);
+  };
+
+  const deleteNode = (nodeId: string) => {
+    if (isRunning) return;
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    setSelectedNode(null);
+  };
+
+  const saveNode = (nodeId: string, nextData: Record<string, string | number>) => {
+    if (isRunning) return;
+
+    const currentNode = nodes.find((node) => node.id === nodeId);
+    if (!currentNode) return;
+
+    const hasChanges = JSON.stringify(currentNode.data) !== JSON.stringify(nextData);
+    if (!hasChanges) return;
+
+    const newNodeId = makeNodeId(currentNode.type as NodeKind);
+    const recreatedNode = {
+      ...currentNode,
+      id: newNodeId,
+      data: nextData
+    } as AppNode;
+
+    setNodes((nds) => nds.map((node) => (node.id === nodeId ? recreatedNode : node)));
+    setEdges((eds) =>
+      eds.map((edge) => ({
+        ...edge,
+        source: edge.source === nodeId ? newNodeId : edge.source,
+        target: edge.target === nodeId ? newNodeId : edge.target,
+        id: `${edge.source === nodeId ? newNodeId : edge.source}-${edge.target === nodeId ? newNodeId : edge.target}`
+      }))
+    );
+    setSelectedNode(recreatedNode);
+  };
+
   const handleSelectionChange = (params: OnSelectionChangeParams) => {
     setSelectedNode(params.nodes?.[0] as AppNode || null);
   };
@@ -188,14 +253,12 @@ export default function App() {
     setIsRunning(true);
     abortControllerRef.current = new AbortController();
 
-    // 清空前端缓存与界面状态
     outputBuffer.current = '';
-    setNodes((nds) => nds.map(n => n.id === 'out_1' ? { ...n, data: { text: '' } } : n));
+    setNodes((nds) => nds.map((n) => (n.type === 'outputNode' ? { ...n, data: { text: '' } } : n)));
     setEdges((eds) => eds.map(e => ({ ...e, data: { tokens: [] } })));
 
     try {
-      // 提取 FormatNode 里的 prompt 作为参数
-      const formatNode = nodes.find(n => n.id === 'format_1') as Node<FormatNodeData>;
+      const formatNode = nodes.find(n => n.type === 'formatNode') as Node<FormatNodeData>;
       const formatStr = formatNode?.data?.formatStr || "User: Hello\nAssistant:";
 
       // 向我们刚才写的 Node.js 桥接服务器发起请求
@@ -229,7 +292,7 @@ export default function App() {
           let data;
           try {
             data = JSON.parse(line); // 加入 try-catch 防止报错断开流
-          } catch (parseErr) {
+          } catch {
             console.warn("Skipping invalid JSON chunk:", line);
             continue;
           }
@@ -245,8 +308,8 @@ export default function App() {
           }
         }
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
         console.log("Pipeline stopped by user");
       } else {
         console.error("Run pipeline failed:", err);
@@ -266,11 +329,13 @@ export default function App() {
     <div className="flex bg-gray-900" style={{ width: '100vw', height: '100vh' }}>
       <Sidebar
         selectedNode={selectedNode}
+        onDeleteNode={deleteNode}
+        onSaveNode={saveNode}
         onRun={runPipeline}
         onStop={stopPipeline}
         isRunning={isRunning}
       />
-      <div className="flex-1 h-full relative">
+      <div className="flex-1 h-full relative" onClick={() => setContextMenu(null)}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -280,12 +345,28 @@ export default function App() {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes} // [应用自定义连线]
           onSelectionChange={handleSelectionChange}
+          onPaneContextMenu={(event) => {
+            event.preventDefault();
+            if (isRunning) return;
+            setContextMenu({ x: event.clientX - 320, y: event.clientY });
+          }}
           fitView
           proOptions={{ hideAttribution: true }}
         >
           <Background color="#374151" />
           <Controls />
         </ReactFlow>
+
+        {contextMenu && (
+          <div
+            className="absolute z-10 bg-gray-800 border border-gray-700 rounded-md shadow-xl min-w-[180px]"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button onClick={() => addNodeByContextMenu('formatNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Format 节点</button>
+            <button onClick={() => addNodeByContextMenu('inferenceNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Inference 节点</button>
+            <button onClick={() => addNodeByContextMenu('outputNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Output 节点</button>
+          </div>
+        )}
       </div>
       <LogSidebar />
     </div>
