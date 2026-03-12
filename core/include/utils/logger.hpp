@@ -5,6 +5,7 @@
 #include <chrono>
 #include <mutex>
 #include <iomanip>
+#include <functional>
 
 #include "core/init_manager.hpp"
 #include "utils/types.hpp"
@@ -43,8 +44,17 @@ namespace astra_rp
 
         class Logger
         {
+        public:
+            using LogCallback =
+                std::function<void(
+                    LogLevel,
+                    const Str &,
+                    int,
+                    const Str &)>;
+
         private:
             std::mutex m_mtx;
+            LogCallback m_callback = nullptr;
 
             astra_rp::core::InitManager &m_init;
 
@@ -70,9 +80,17 @@ namespace astra_rp
             Logger &operator=(Logger &&) noexcept = default;
 
         public:
+            void set_callback(LogCallback cb)
+            {
+                std::lock_guard<std::mutex> lock(m_mtx);
+                m_callback = std::move(cb);
+            }
+
             void log(LogLevel level, const Str &file, int line, const Str &msg)
             {
                 std::lock_guard<std::mutex> lock(m_mtx);
+                if (m_callback)
+                    m_callback(level, file, line, msg);
 
                 auto now = std::chrono::system_clock::now();
                 auto time = std::chrono::system_clock::to_time_t(now);

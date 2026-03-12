@@ -4,14 +4,15 @@
 #include <vector>
 
 #include "core/global_config.hpp"
+#include "core/tokenizer.hpp"
+#include "core/model_manager.hpp"
 #include "pipeline/graph.hpp"
 #include "pipeline/scheduler.hpp"
 #include "pipeline/event_bus.hpp"
 #include "pipeline/inference_node.hpp"
 #include "pipeline/format_node.hpp"
 #include "pipeline/output_node.hpp"
-#include "core/tokenizer.hpp"
-#include "core/model_manager.hpp"
+#include "utils/logger.hpp"
 
 using namespace astra_rp;
 
@@ -44,6 +45,69 @@ Napi::Value InitSystem(const Napi::CallbackInfo &info)
     }
 
     return Napi::Boolean::New(env, true);
+}
+
+Napi::ThreadSafeFunction g_log_tsfn;
+
+Napi::Value SetLogCallback(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsFunction())
+    {
+        Napi::TypeError::
+            New(env, "Function expected")
+                .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    g_log_tsfn =
+        Napi::ThreadSafeFunction::New(
+            env,
+            info[0].As<Napi::Function>(), "LogCallback", 0, 1);
+    g_log_tsfn.Unref(env); // 避免由于日志监听导致 Node 进程无法自然退出
+
+    astra_rp::utils::Logger::instance().set_callback(
+        [](astra_rp::utils::LogLevel level,
+           const astra_rp::Str &file,
+           int line,
+           const astra_rp::Str &msg)
+        {
+            if (!g_log_tsfn)
+                return;
+
+            struct LogData
+            {
+                int level;
+                std::string file;
+                int line;
+                std::string msg;
+            };
+            auto *data =
+                new LogData{
+                    static_cast<int>(level),
+                    file,
+                    line,
+                    msg};
+
+            // 使用非阻塞调用防止 C++ 推理主线程被锁死
+            g_log_tsfn.NonBlockingCall(
+                data,
+                [](Napi::Env env,
+                   Napi::Function jsCb,
+                   LogData *data)
+                {
+                    if (env != nullptr && jsCb != nullptr)
+                    {
+                        jsCb.Call(
+                            {Napi::Number::New(env, data->level),
+                             Napi::String::New(env, data->file),
+                             Napi::Number::New(env, data->line),
+                             Napi::String::New(env, data->msg)});
+                    }
+                    delete data;
+                });
+        });
+    return env.Undefined();
 }
 
 Napi::Value Detokenize(const Napi::CallbackInfo &info)
@@ -334,6 +398,7 @@ public:
 Napi::Object InitAll(Napi::Env env, Napi::Object exports)
 {
     exports.Set("initSystem", Napi::Function::New(env, InitSystem));
+    exports.Set("setLogCallback", Napi::Function::New(env, SetLogCallback));
     exports.Set("detokenize", Napi::Function::New(env, Detokenize));
     return PipelineWrapper::Init(env, exports);
 }
