@@ -11,8 +11,43 @@ namespace astra_rp
         class FormatNode : public BaseNode
         {
         public:
+            struct FormatPart
+            {
+                enum class Type
+                {
+                    TEXT,
+                    NODE
+                };
+
+                Type type = Type::TEXT;
+                Str value;
+            };
+
             using FormatterFunc =
                 std::function<Str(const HashMap<Str, NodePayload> &)>;
+
+            static Str apply_format(
+                const Vec<FormatPart> &parts,
+                const HashMap<Str, NodePayload> &inputs)
+            {
+                Str output;
+                for (const auto &part : parts)
+                {
+                    if (part.type == FormatPart::Type::TEXT)
+                    {
+                        output += part.value;
+                        continue;
+                    }
+
+                    auto it = inputs.find(part.value);
+                    if (it != inputs.end())
+                    {
+                        output += it->second.output;
+                    }
+                }
+
+                return output;
+            }
 
         private:
             FormatterFunc m_formatter;
@@ -38,6 +73,15 @@ namespace astra_rp
                     if (!m_inputs.empty())
                     {
                         m_output.output = m_inputs.begin()->second.output;
+                    }
+                }
+
+                if (m_bus)
+                {
+                    for (const char ch : m_output.output)
+                    {
+                        Str token(1, ch);
+                        m_bus->publish_token(m_id, token);
                     }
                 }
 

@@ -29,6 +29,7 @@ import TokenEdge from './edges/TokenEdge';
 
 type FormatNodeData = {
   formatStr: string;
+  runtimeParts?: Record<string, string>;
 };
 
 type InferenceNodeData = {
@@ -244,6 +245,18 @@ function AppCanvas() {
       }
     }
 
+
+    const formatUpdates = new Map<string, Record<string, string>>();
+    for (const edge of edges) {
+      if (edge.source !== nodeId) continue;
+      const targetNode = nodeById.get(edge.target);
+      if (!targetNode || targetNode.type !== 'formatNode') continue;
+      const targetData = targetNode.data as FormatNodeData;
+      const currentRuntime = { ...(targetData.runtimeParts ?? {}) };
+      currentRuntime[nodeId] = `${currentRuntime[nodeId] ?? ''}${char}`;
+      formatUpdates.set(edge.target, currentRuntime);
+    }
+
     // 将 Ref 的突变操作提取到 setState 外部，避免 React 严格模式重复执行导致 token 翻倍
     for (const node of nodes) {
       const increment = outputIncrements.get(node.id) ?? 0;
@@ -263,6 +276,13 @@ function AppCanvas() {
           return {
             ...node,
             data: { ...data, text: outputBuffers.current[node.id] }
+          };
+        }
+        if (node.type === 'formatNode' && formatUpdates.has(node.id)) {
+          const data = node.data as FormatNodeData;
+          return {
+            ...node,
+            data: { ...data, runtimeParts: formatUpdates.get(node.id) }
           };
         }
         return node;
@@ -511,7 +531,11 @@ function AppCanvas() {
 
     outputBuffers.current = {};
     tokenRoutingMode.current = 'unknown';
-    setNodes((nds) => nds.map((n) => (n.type === 'outputNode' ? { ...n, data: { ...(n.data as OutputNodeData), text: '' } } : n)));
+    setNodes((nds) => nds.map((n) => {
+      if (n.type === 'outputNode') return { ...n, data: { ...(n.data as OutputNodeData), text: '' } };
+      if (n.type === 'formatNode') return { ...n, data: { ...(n.data as FormatNodeData), runtimeParts: {} } };
+      return n;
+    }));
     setEdges((eds) => eds.map((e) => ({ ...e, animated: true, style: { ...(e.style ?? {}), strokeDasharray: '5,5' }, data: { tokens: [] } })));
 
     try {
@@ -600,6 +624,7 @@ function AppCanvas() {
   return (
     <div className="flex bg-gray-900" style={{ width: '100vw', height: '100vh' }}>
       <Sidebar
+        allEdges={edges}
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
         selectedNodeCount={selectedNodes.length}

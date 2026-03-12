@@ -1,4 +1,5 @@
 #include <napi.h>
+#include <nlohmann/json.hpp>
 #include <thread>
 #include <memory>
 #include <vector>
@@ -256,12 +257,53 @@ public:
     {
         Napi::Env env = info.Env();
         std::string id = info[0].As<Napi::String>().Utf8Value();
-        std::string prompt = info[1].As<Napi::String>().Utf8Value(); // 简单的静态 prompt 演示
+        std::string format_spec = info[1].As<Napi::String>().Utf8Value();
+
+        Vec<pipeline::FormatNode::FormatPart> parts;
+        try
+        {
+            auto json = nlohmann::json::parse(format_spec);
+            if (json.is_array())
+            {
+                for (const auto &item : json)
+                {
+                    if (!item.is_object())
+                        continue;
+
+                    const auto type = item.value("type", "text");
+                    if (type == "node")
+                    {
+                        parts.push_back({
+                            pipeline::FormatNode::FormatPart::Type::NODE,
+                            item.value("id", Str())});
+                    }
+                    else
+                    {
+                        parts.push_back({
+                            pipeline::FormatNode::FormatPart::Type::TEXT,
+                            item.value("value", Str())});
+                    }
+                }
+            }
+        }
+        catch (...)
+        {
+            parts.push_back({
+                pipeline::FormatNode::FormatPart::Type::TEXT,
+                format_spec});
+        }
+
+        if (parts.empty())
+        {
+            parts.push_back({
+                pipeline::FormatNode::FormatPart::Type::TEXT,
+                format_spec});
+        }
 
         auto formatter =
-            [prompt](const HashMap<Str, pipeline::NodePayload> &inputs) -> Str
+            [parts = std::move(parts)](const HashMap<Str, pipeline::NodePayload> &inputs) -> Str
         {
-            return prompt; // 实际逻辑可以合并 inputs
+            return pipeline::FormatNode::apply_format(parts, inputs);
         };
 
         auto node = std::make_shared<pipeline::FormatNode>(id, m_bus, formatter);

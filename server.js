@@ -8,6 +8,34 @@ const WebSocket = require('ws');
 const astra = require('./build/Release/astrarp_node.node');
 
 const app = express();
+
+const parseFormatStr = (raw) => {
+    const format = String(raw || '');
+    const parts = [];
+    const regex = /\{\{\s*node:([A-Za-z0-9_-]+)\s*\}\}/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(format)) !== null) {
+        const start = match.index;
+        if (start > lastIndex) {
+            parts.push({ type: 'text', value: format.slice(lastIndex, start) });
+        }
+        parts.push({ type: 'node', id: match[1] });
+        lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < format.length) {
+        parts.push({ type: 'text', value: format.slice(lastIndex) });
+    }
+
+    if (parts.length === 0) {
+        parts.push({ type: 'text', value: format });
+    }
+
+    return parts;
+};
+
 app.use(cors());
 app.use(express.json());
 
@@ -87,7 +115,7 @@ app.post('/api/run', (req, res) => {
 
             if (node.type === 'formatNode') {
                 const prompt = node?.data?.formatStr || 'User: Hello\nAssistant:';
-                pipeline.addFormatNode(node.id, String(prompt));
+                pipeline.addFormatNode(node.id, JSON.stringify(parseFormatStr(prompt)));
             } else if (node.type === 'inferenceNode') {
                 pipeline.addInferenceNode(node.id);
                 inferenceNodeIds.add(node.id);
