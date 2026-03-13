@@ -30,9 +30,18 @@ export default function TokenEdge({
       <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
 
       {tokens.length > 0 && (
-        <circle r="3.5" className="fill-violet-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.9)]">
-          <animateMotion dur="1.8s" repeatCount="indefinite" path={edgePath} rotate="auto" />
-        </circle>
+        <g>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <circle r="4" className="fill-violet-400" filter="url(#glow)">
+            <animateMotion dur="1.5s" repeatCount="indefinite" path={edgePath} rotate="auto" />
+          </circle>
+        </g>
       )}
     </>
   );

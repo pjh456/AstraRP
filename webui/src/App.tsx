@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { Toaster, toast } from 'sonner';
 import {
   ReactFlow,
   Controls,
@@ -8,7 +9,8 @@ import {
   useEdgesState,
   addEdge,
   useReactFlow,
-  ReactFlowProvider
+  ReactFlowProvider,
+  MiniMap
 } from '@xyflow/react';
 import type {
   Node,
@@ -768,9 +770,9 @@ function AppCanvas() {
 
           if (data.error) {
             console.error('Backend Error:', data.error);
-            alert('Engine Error: ' + data.error);
+            toast.error(`Engine Error: ${data.error}`);
           } else if (data.done) {
-            console.log('Pipeline execution finished!');
+            toast.success('Pipeline execution finished!');
           } else if (data.text) {
             handleIncomingToken(data.nodeId, data.text);
           }
@@ -814,102 +816,117 @@ function AppCanvas() {
 
   return (
     <div className="relative bg-gray-900 overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
-      <div className={`absolute left-0 top-0 z-20 h-full transition-transform duration-300 ${isLeftSidebarCollapsed ? '-translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
-        <Sidebar
-          allEdges={edges}
-          selectedNode={selectedNode}
-          selectedEdge={selectedEdge}
-          selectedNodeCount={selectedNodes.length}
-          selectedEdgeCount={selectedEdges.length}
-          isMultiSelection={isMultiSelection}
-          onDeleteNode={deleteNode}
-          onDeleteEdge={deleteEdge}
-          onDeleteSelection={deleteSelection}
-          onSaveNode={saveNode}
-          onSaveEdge={saveEdge}
-          onCopyNode={copySingleNode}
-          onCopySelection={copySelection}
-          onRun={runPipeline}
-          onStop={stopPipeline}
-          isRunning={isRunning}
-          graphConfig={graphConfig}
-          graphStatus={graphStatus}
-          onLoadGraphConfig={loadGraphConfig}
-          onSaveGraphConfig={saveGraphConfig}
-        />
-        <button
-          type="button"
-          onClick={() => setIsLeftSidebarCollapsed((prev) => !prev)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full w-8 h-20 rounded-r-xl bg-gray-800 border border-gray-700 border-l-0 text-gray-200 hover:bg-gray-700"
-          title={isLeftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'}
-        >
-          {isLeftSidebarCollapsed ? '>' : '<'}
-        </button>
-      </div>
-
-      <div ref={paneRef} className="h-full relative" onClick={() => setContextMenu(null)}>
-        <ReactFlow
-          nodes={renderNodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-          onConnect={onConnect}
-          isValidConnection={isValidConnection}
-          nodesConnectable={!isRunning}
-          connectionMode={ConnectionMode.Strict}
-          deleteKeyCode={isRunning ? null : ['Delete', 'Backspace']}
-          multiSelectionKeyCode="Shift"
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          onSelectionChange={handleSelectionChange}
-          onlyRenderVisibleElements
-          onPaneContextMenu={(event) => {
-            event.preventDefault();
-            if (isRunning || !paneRef.current) return;
-            const rect = paneRef.current.getBoundingClientRect();
-            const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-            setContextMenu({
-              x: event.clientX - rect.left,
-              y: event.clientY - rect.top,
-              flowX: flowPosition.x,
-              flowY: flowPosition.y
-            });
-          }}
-          fitView
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="#374151" />
-          <Controls />
-        </ReactFlow>
-
-        {!isRunning && (
-          <div className="absolute bottom-4 left-4 text-xs text-gray-400 bg-gray-900/80 border border-gray-700 rounded px-3 py-2">
-            左键从节点右侧小圆点拖到目标左侧小圆点连边；按 Shift 可多选，按 Delete 可删节点/边。
-          </div>
-        )}
-
-        {contextMenu && (
-          <div
-            className="absolute z-10 bg-gray-800 border border-gray-700 rounded-md shadow-xl min-w-[180px]"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+      <Toaster theme="dark" position="top-center" richColors />
+      <div className="relative bg-gray-900 overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
+        <div className={`absolute left-0 top-0 z-20 h-full transition-transform duration-300 ${isLeftSidebarCollapsed ? '-translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
+          <Sidebar
+            allEdges={edges}
+            selectedNode={selectedNode}
+            selectedEdge={selectedEdge}
+            selectedNodeCount={selectedNodes.length}
+            selectedEdgeCount={selectedEdges.length}
+            isMultiSelection={isMultiSelection}
+            onDeleteNode={deleteNode}
+            onDeleteEdge={deleteEdge}
+            onDeleteSelection={deleteSelection}
+            onSaveNode={saveNode}
+            onSaveEdge={saveEdge}
+            onCopyNode={copySingleNode}
+            onCopySelection={copySelection}
+            onRun={runPipeline}
+            onStop={stopPipeline}
+            isRunning={isRunning}
+            graphConfig={graphConfig}
+            graphStatus={graphStatus}
+            onLoadGraphConfig={loadGraphConfig}
+            onSaveGraphConfig={saveGraphConfig}
+          />
+          <button
+            type="button"
+            onClick={() => setIsLeftSidebarCollapsed((prev) => !prev)}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full w-8 h-20 rounded-r-xl bg-gray-800 border border-gray-700 border-l-0 text-gray-200 hover:bg-gray-700"
+            title={isLeftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'}
           >
-            <button onClick={() => addNodeByContextMenu('formatNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Format 节点</button>
-            <button onClick={() => addNodeByContextMenu('inferenceNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Inference 节点</button>
-            <button onClick={() => addNodeByContextMenu('outputNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Output 节点</button>
-          </div>
-        )}
-      </div>
+            {isLeftSidebarCollapsed ? '>' : '<'}
+          </button>
+        </div>
 
-      <div className={`absolute right-0 top-0 z-20 h-full transition-transform duration-300 ${isRightSidebarCollapsed ? 'translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
-        <button
-          type="button"
-          onClick={() => setIsRightSidebarCollapsed((prev) => !prev)}
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full w-8 h-20 rounded-l-xl bg-gray-800 border border-gray-700 border-r-0 text-gray-200 hover:bg-gray-700"
-          title={isRightSidebarCollapsed ? '展开日志栏' : '收起日志栏'}
-        >
-          {isRightSidebarCollapsed ? '<' : '>'}
-        </button>
-        <LogSidebar />
+        <div ref={paneRef} className="h-full relative" onClick={() => setContextMenu(null)}>
+          <ReactFlow
+            nodes={renderNodes}
+            edges={edges}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            nodesConnectable={!isRunning}
+            connectionMode={ConnectionMode.Strict}
+            deleteKeyCode={isRunning ? null : ['Delete', 'Backspace']}
+            multiSelectionKeyCode="Shift"
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            onSelectionChange={handleSelectionChange}
+            onlyRenderVisibleElements
+            onPaneContextMenu={(event) => {
+              event.preventDefault();
+              if (isRunning || !paneRef.current) return;
+              const rect = paneRef.current.getBoundingClientRect();
+              const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+              setContextMenu({
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top,
+                flowX: flowPosition.x,
+                flowY: flowPosition.y
+              });
+            }}
+            fitView
+            proOptions={{ hideAttribution: true }}
+            snapToGrid={true}
+            snapGrid={[15, 15]}
+          >
+            <Background color="#4b5563" gap={15} size={1} />
+            <Controls className="bg-gray-800 border-gray-700 fill-gray-300" />
+            <MiniMap
+              className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden"
+              maskColor="rgba(17, 24, 39, 0.7)"
+              nodeColor={(node) => {
+                if (node.type === 'inferenceNode') return '#a855f7';
+                if (node.type === 'formatNode') return '#3b82f6';
+                if (node.type === 'outputNode') return '#22c55e';
+                return '#6b7280';
+              }}
+            />
+          </ReactFlow>
+
+          {!isRunning && (
+            <div className="absolute bottom-4 left-4 text-xs text-gray-400 bg-gray-900/80 border border-gray-700 rounded px-3 py-2">
+              左键从节点右侧小圆点拖到目标左侧小圆点连边；按 Shift 可多选，按 Delete 可删节点/边。
+            </div>
+          )}
+
+          {contextMenu && (
+            <div
+              className="absolute z-10 bg-gray-800 border border-gray-700 rounded-md shadow-xl min-w-[180px]"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              <button onClick={() => addNodeByContextMenu('formatNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Format 节点</button>
+              <button onClick={() => addNodeByContextMenu('inferenceNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Inference 节点</button>
+              <button onClick={() => addNodeByContextMenu('outputNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Output 节点</button>
+            </div>
+          )}
+        </div>
+
+        <div className={`absolute right-0 top-0 z-20 h-full transition-transform duration-300 ${isRightSidebarCollapsed ? 'translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
+          <button
+            type="button"
+            onClick={() => setIsRightSidebarCollapsed((prev) => !prev)}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full w-8 h-20 rounded-l-xl bg-gray-800 border border-gray-700 border-r-0 text-gray-200 hover:bg-gray-700"
+            title={isRightSidebarCollapsed ? '展开日志栏' : '收起日志栏'}
+          >
+            {isRightSidebarCollapsed ? '<' : '>'}
+          </button>
+          <LogSidebar />
+        </div>
       </div>
     </div>
   );
