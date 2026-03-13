@@ -20,7 +20,7 @@ const LEVEL_COLORS: Record<LogLevel, string> = {
     FATAL: 'text-red-600 font-bold bg-red-900/20',
 };
 
-export default function LogSidebar() {
+export default function LogSidebar({ className = '' }: { className?: string }) {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     // 默认多选：只看INFO及以上
     const [activeLevels, setActiveLevels] = useState<Set<LogLevel>>(new Set(['INFO', 'WARN', 'ERROR', 'FATAL']));
@@ -68,7 +68,7 @@ export default function LogSidebar() {
     const filteredLogs = logs.filter(log => activeLevels.has(log.level));
 
     return (
-        <aside className="w-80 h-full bg-gray-900 border-l border-gray-800 flex flex-col z-10">
+        <aside className={`w-80 h-full bg-gray-900 border-l border-gray-800 flex flex-col z-10 ${className}`}>
             {/* Header */}
             <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900">
                 <div className="flex items-center gap-2">

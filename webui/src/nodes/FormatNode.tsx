@@ -34,13 +34,13 @@ export default function FormatNode({ data }: NodeProps) {
   const parts = parseFormatStr(nodeData.formatStr || '');
 
   return (
-    <div className="bg-gray-800 border border-blue-500 rounded-lg shadow-lg min-w-[250px] overflow-hidden">
+    <div className="bg-gray-800 border border-blue-500 rounded-lg shadow-lg w-[320px] max-w-[320px] overflow-hidden">
       <div className="bg-blue-600/20 px-3 py-2 border-b border-blue-500/50 flex items-center gap-2">
         <FileText size={16} className="text-blue-400" />
         <span className="text-sm font-bold text-gray-100">Format Prompt</span>
       </div>
 
-      <div className="p-3 text-xs text-gray-300 whitespace-pre-wrap leading-relaxed flex flex-wrap gap-1">
+      <div className="p-3 text-xs text-gray-300 whitespace-pre-wrap leading-relaxed flex flex-wrap gap-1 max-h-[220px] overflow-y-auto">
         {parts.map((part, index) =>
           part.type === 'text' ? (
             <span key={`${part.type}-${index}`} className="text-gray-200">

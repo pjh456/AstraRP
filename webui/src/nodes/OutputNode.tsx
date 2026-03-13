@@ -11,7 +11,7 @@ export default function OutputNode({ data, id }: NodeProps) {
     const nodeData = data as OutputNodeData;
 
     return (
-        <div className="bg-gray-800 border border-green-500 rounded-lg shadow-lg min-w-[250px] max-w-[350px] overflow-hidden flex flex-col">
+        <div className="bg-gray-800 border border-green-500 rounded-lg shadow-lg w-[320px] max-w-[320px] overflow-hidden flex flex-col">
             <div className="bg-green-600/20 px-3 py-2 border-b border-green-500/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Terminal size={16} className="text-green-400" />
@@ -27,7 +27,7 @@ export default function OutputNode({ data, id }: NodeProps) {
                 </button>
             </div>
 
-            <div className="p-3 text-xs text-gray-300 min-h-[80px] max-h-[200px] overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">
+            <div className="p-3 text-xs text-gray-300 min-h-[80px] max-h-[220px] overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed break-words">
                 {nodeData.text ? (
                     nodeData.text
                 ) : (

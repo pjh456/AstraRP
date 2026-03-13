@@ -77,7 +77,7 @@ const MAX_EDGE_TOKENS = 24;
 
 type TokenEvent = {
   nodeId: string;
-  char: string;
+  tokenChunk: string;
 };
 
 const nodePrefix: Record<NodeKind, string> = {
@@ -198,6 +198,8 @@ function AppCanvas() {
   const tokenRoutingMode = useRef<'unknown' | 'inferOnly' | 'outputEmits'>('unknown');
   const [graphConfig, setGraphConfig] = useState<GraphConnectionConfig | null>(null);
   const [graphStatus, setGraphStatus] = useState('未读取图连接配置');
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
 
   const tokenQueueRef = useRef<TokenEvent[]>([]);
   const flushRafRef = useRef<number | null>(null);
@@ -237,7 +239,7 @@ function AppCanvas() {
     const touchedFormats = new Set<string>();
     const edgeTokenAppends = new Map<string, string[]>();
 
-    for (const { nodeId, char } of events) {
+    for (const { nodeId, tokenChunk } of events) {
       const emittingNode = nodeById.get(nodeId);
       if (!emittingNode) continue;
 
@@ -302,7 +304,7 @@ function AppCanvas() {
       for (const [targetId, increment] of outputIncrements.entries()) {
         if (increment <= 0 && !switchedToOutputMode) continue;
         const baseText = switchedToOutputMode ? '' : (outputBuffers.current[targetId] ?? '');
-        const nextText = increment > 0 ? `${baseText}${char.repeat(increment)}` : baseText;
+        const nextText = increment > 0 ? `${baseText}${tokenChunk.repeat(increment)}` : baseText;
         outputBuffers.current[targetId] = nextText;
         touchedOutputs.add(targetId);
       }
@@ -311,7 +313,7 @@ function AppCanvas() {
         const targetNode = nodeById.get(targetId);
         if (!targetNode || targetNode.type !== 'formatNode') continue;
         const runtimeParts = formatRuntimeRef.current[targetId] ?? {};
-        runtimeParts[nodeId] = `${runtimeParts[nodeId] ?? ''}${char}`;
+        runtimeParts[nodeId] = `${runtimeParts[nodeId] ?? ''}${tokenChunk}`;
         formatRuntimeRef.current[targetId] = runtimeParts;
         touchedFormats.add(targetId);
       }
@@ -321,7 +323,7 @@ function AppCanvas() {
         const edgeId = edgeIdByKey.get(edgeKey);
         if (!edgeId) continue;
         const arr = edgeTokenAppends.get(edgeId) ?? [];
-        for (let i = 0; i < increment; i += 1) arr.push(char);
+        for (let i = 0; i < increment; i += 1) arr.push(tokenChunk);
         edgeTokenAppends.set(edgeId, arr);
       }
     }
@@ -351,8 +353,8 @@ function AppCanvas() {
     }
   }, [setEdges, setNodes]);
 
-  const handleIncomingToken = useCallback((nodeId: string, char: string) => {
-    tokenQueueRef.current.push({ nodeId, char });
+  const handleIncomingToken = useCallback((nodeId: string, tokenChunk: string) => {
+    tokenQueueRef.current.push({ nodeId, tokenChunk });
     if (flushRafRef.current == null) {
       flushRafRef.current = window.requestAnimationFrame(() => {
         flushTokenQueue();
@@ -811,8 +813,9 @@ function AppCanvas() {
   };
 
   return (
-    <div className="flex bg-gray-900" style={{ width: '100vw', height: '100vh' }}>
-      <Sidebar
+    <div className="relative bg-gray-900 overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
+      <div className={`absolute left-0 top-0 z-20 h-full transition-transform duration-300 ${isLeftSidebarCollapsed ? '-translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
+        <Sidebar
         allEdges={edges}
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
@@ -834,7 +837,17 @@ function AppCanvas() {
         onLoadGraphConfig={loadGraphConfig}
         onSaveGraphConfig={saveGraphConfig}
       />
-      <div ref={paneRef} className="flex-1 h-full relative" onClick={() => setContextMenu(null)}>
+        <button
+          type="button"
+          onClick={() => setIsLeftSidebarCollapsed((prev) => !prev)}
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full w-8 h-20 rounded-r-xl bg-gray-800 border border-gray-700 border-l-0 text-gray-200 hover:bg-gray-700"
+          title={isLeftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'}
+        >
+          {isLeftSidebarCollapsed ? '>' : '<'}
+        </button>
+      </div>
+
+      <div ref={paneRef} className="h-full relative" onClick={() => setContextMenu(null)}>
         <ReactFlow
           nodes={renderNodes}
           edges={edges}
@@ -849,6 +862,7 @@ function AppCanvas() {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onSelectionChange={handleSelectionChange}
+          onlyRenderVisibleElements
           onPaneContextMenu={(event) => {
             event.preventDefault();
             if (isRunning || !paneRef.current) return;
@@ -885,7 +899,18 @@ function AppCanvas() {
           </div>
         )}
       </div>
-      <LogSidebar />
+
+      <div className={`absolute right-0 top-0 z-20 h-full transition-transform duration-300 ${isRightSidebarCollapsed ? 'translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
+        <button
+          type="button"
+          onClick={() => setIsRightSidebarCollapsed((prev) => !prev)}
+          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full w-8 h-20 rounded-l-xl bg-gray-800 border border-gray-700 border-r-0 text-gray-200 hover:bg-gray-700"
+          title={isRightSidebarCollapsed ? '展开日志栏' : '收起日志栏'}
+        >
+          {isRightSidebarCollapsed ? '<' : '>'}
+        </button>
+        <LogSidebar />
+      </div>
     </div>
   );
 }
