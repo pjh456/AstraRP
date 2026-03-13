@@ -14,6 +14,13 @@ const astra = require('./build/Release/astrarp_node.node');
 const app = express();
 
 
+
+const safelyInvokePipelineMethod = (pipeline, methodName, ...args) => {
+    if (!pipeline || typeof pipeline[methodName] !== 'function') return false;
+    pipeline[methodName](...args);
+    return true;
+};
+
 const sanitizeInferenceConfig = (raw) => {
     const data = raw && typeof raw === 'object' ? raw : {};
     return {
@@ -174,7 +181,7 @@ app.post('/api/run', (req, res) => {
         console.error("Pipeline initialization failed (Likely OOM):", e);
         res.write(JSON.stringify({ error: e.message }) + '\n');
         res.end();
-        pipeline.dispose(); // 初始化失败也要释放
+        safelyInvokePipelineMethod(pipeline, "dispose"); // 兼容无 dispose 版本绑定
         return;
     }
 
@@ -196,7 +203,7 @@ app.post('/api/run', (req, res) => {
         if (!isFinished && disconnectedEarly) {
             isClientDisconnected = true;
             console.log("Client aborted response stream, stopping pipeline...");
-            pipeline.stop();
+            safelyInvokePipelineMethod(pipeline, "stop");
         }
     });
 
@@ -220,7 +227,7 @@ app.post('/api/run', (req, res) => {
         }
 
         // 推理结束，手动释放 C++ 内存，归还大模型 KV Context
-        pipeline.dispose();
+        safelyInvokePipelineMethod(pipeline, "dispose");
     });
 });
 
