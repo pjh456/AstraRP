@@ -271,12 +271,21 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
           : Object.entries(draftData).map(([key, value]) => (
             <div key={key} className="flex flex-col gap-1">
               <label className="text-xs text-gray-400 capitalize">{key}</label>
-              <input
-                disabled={isRunning}
-                className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-300 focus:border-purple-500 focus:outline-none"
-                value={String(value ?? '')}
-                onChange={(event) => handleTextOrNumberChange(key, event.target.value)}
-              />
+              {key === 'formatStr' ? (
+                <textarea
+                  disabled={isRunning}
+                  className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-300 focus:border-purple-500 focus:outline-none min-h-[80px] resize-y font-mono"
+                  value={String(value ?? '')}
+                  onChange={(event) => handleTextOrNumberChange(key, event.target.value)}
+                />
+              ) : (
+                <input
+                  disabled={isRunning}
+                  className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-300 focus:border-purple-500 focus:outline-none"
+                  value={String(value ?? '')}
+                  onChange={(event) => handleTextOrNumberChange(key, event.target.value)}
+                />
+              )}
             </div>
           ))}
 

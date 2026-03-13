@@ -4,8 +4,8 @@
       "id": "format_5_edit",
       "type": "formatNode",
       "position": {
-        "x": -547.6001985331784,
-        "y": 440.0911609813446
+        "x": -796.1892482754917,
+        "y": 185.43896368434082
       },
       "data": {
         "formatStr": "用户：你好！",
@@ -16,14 +16,14 @@
       "id": "infer_3_edit",
       "type": "inferenceNode",
       "position": {
-        "x": -130.38035091121378,
-        "y": 214.8334463394168
+        "x": -47.012072034218505,
+        "y": -82.26078384042093
       },
       "data": {
         "model": "qwen2.5-0.5b",
         "addSpecial": true,
         "parseSpecial": true,
-        "maxTokens": 3,
+        "maxTokens": 2,
         "temperature": 0.7,
         "topK": 40,
         "topP": 0.9,
@@ -39,14 +39,14 @@
       "id": "infer_2_edit",
       "type": "inferenceNode",
       "position": {
-        "x": -128.68265953139002,
-        "y": 401.37376554230036
+        "x": -58.95646265244851,
+        "y": 133.0794862472428
       },
       "data": {
         "model": "qwen2.5-0.5b",
         "addSpecial": true,
         "parseSpecial": true,
-        "maxTokens": 3,
+        "maxTokens": 2,
         "temperature": 0.7,
         "topK": 40,
         "topP": 0.9,
@@ -62,14 +62,14 @@
       "id": "infer_1_edit",
       "type": "inferenceNode",
       "position": {
-        "x": -126.8160214070237,
-        "y": 592.9161343426512
+        "x": -58.402622710698225,
+        "y": 389.4724917148632
       },
       "data": {
         "model": "qwen2.5-0.5b",
         "addSpecial": true,
         "parseSpecial": true,
-        "maxTokens": 3,
+        "maxTokens": 2,
         "temperature": 0.7,
         "topK": 40,
         "topP": 0.9,
@@ -85,8 +85,8 @@
       "id": "out_1",
       "type": "outputNode",
       "position": {
-        "x": 149.78537863122037,
-        "y": 233.66043431903006
+        "x": 304.6804285730085,
+        "y": -18.779180293014853
       },
       "data": {
         "text": "普通用户\\n"
@@ -96,8 +96,8 @@
       "id": "out_2",
       "type": "outputNode",
       "position": {
-        "x": 139.29725788152882,
-        "y": 426.44569008013286
+        "x": 295.6273013020333,
+        "y": 154.66944216597574
       },
       "data": {
         "text": "获取信息\\n"
@@ -107,75 +107,71 @@
       "id": "format_3_edit",
       "type": "formatNode",
       "position": {
-        "x": -340.05050868284,
-        "y": -79.36433558931105
+        "x": -419.03602925722726,
+        "y": 120.71953371547764
       },
       "data": {
-        "formatStr": "任务：判断用户意图。\\n类别：获取信息 / 请求帮助 / 寻求建议 / 创作请求 / 技术支持 / 情绪表达 / 闲聊互动 / 其他\\n只输出类别名称。\\n 例子：\\n用户：Python怎么读取文件？\\n答案：技术支持\\n用户：今天好无聊\\n答案：闲聊互动\\n现在判断：\\n{{node:format_5_edit}}\\n答案：",
-        "runtimeParts": {
-          "format_5_edit": "用户：你好！"
-        }
+        "formatStr": "任务：判断用户意图。\n类别：获取信息 / 请求帮助 / 寻求建议 / 创作请求 / 技术支持 / 情绪表达 / 闲聊互动 / 其他\n只输出类别名称。\n例子：\n用户：Python怎么读取文件？\n答案：技术支持\n用户：今天好无聊\n答案：闲聊互动\n现在判断：{{node:format_5_edit}}\n答案："
       }
     },
     {
       "id": "format_4_edit",
       "type": "formatNode",
       "position": {
-        "x": -343.78116443311353,
-        "y": 55.07396499669068
+        "x": -420.90420977910776,
+        "y": 405.7842747844934
       },
       "data": {
-        "formatStr": "任务：判断用户语气对助手好感度的变化量。\\n评分范围：\\n10 = 非常感谢或强烈赞美\\n5 = 明显友好或感谢\\n2 = 礼貌或友好\\n0 = 普通提问或中性交流\\n-2 = 略微不耐烦或质疑\\n-5 = 明显不满\\n-10 = 攻击、辱骂\\n只输出一个整数，范围 -10 到 10，不要解释。 \\n例子：\\n用户：谢谢你，真的帮大忙了！\\n答案：8\\n用户：你好，可以帮我查一下吗？\\n答案：2\\n用户：Python怎么读取文件？\\n答案：0\\n用户：你这个回答不太对吧？\\n答案：-3\\n用户：你到底会不会啊？\\n答案：-8\\n现在判断：\\n{{node:format_5_edit}}\\n答案：",
-        "runtimeParts": {
-          "format_5_edit": "用户：你好！"
-        }
+        "formatStr": "任务：判断用户语气对助手好感度的变化量。\n评分范围：\n10 = 非常感谢或强烈赞美\n5 = 明显友好或感谢\n2 = 礼貌或友好\n0 = 普通提问或中性交流\n-2 = 略微不耐烦或质疑\n-5 = 明显不满\n-10 = 攻击、辱骂\n只输出一个整数，范围 -10 到 10，不要解释。\n例子：\n用户：谢谢你，真的帮大忙了！\n答案：8\n用户：你好，可以帮我查一下吗？\n答案：2\n用户：Python怎么读取文件？\n答案：0\n用户：你这个回答不太对吧？\n答案：-3\n用户：你到底会不会啊？\n答案：-8\n现在判断：{{node:format_5_edit}}\n答案："
       }
     },
     {
       "id": "format_2_edit",
       "type": "formatNode",
       "position": {
-        "x": -346.68594529038415,
-        "y": -199.49035798923506
+        "x": -411.6047136106872,
+        "y": -157.84701156294676
       },
       "data": {
-        "formatStr": "任务：判断用户身份。\\n类别：普通用户 / 学生 / 技术人员 / 内容创作者 / 商业人员 / 情绪支持 / 其他\\n只输出类别名称。\\n 例子：\\n用户：这道高数题怎么做？\\n身份：学生\\n用户：C++怎么写多线程？\\n身份：技术人员\\n现在判断：\\n{{node:format_5_edit}}\\n身份：",
-        "runtimeParts": {
-          "format_5_edit": "用户：你好！"
-        }
+        "formatStr": "任务：判断用户身份。\n类别：普通用户 / 学生 / 技术人员 / 内容创作者 / 商业人员 / 情绪支持 / 其他\n只输出类别名称。\n例子：\n用户：这道高数题怎么做？\n身份：学生\n用户：C++怎么写多线程？\n身份：技术人员\n现在判断：{{node:format_5_edit}}\n身份："
       }
     },
     {
       "id": "out_3",
       "type": "outputNode",
       "position": {
-        "x": 148.66739412697837,
-        "y": 618.5075358142631
+        "x": 303.6028407737447,
+        "y": 399.2920322757502
       },
       "data": {
-        "text": "-2\\n"
+        "text": "-1\\n"
       }
     },
     {
       "id": "format_1_edit",
       "type": "formatNode",
       "position": {
-        "x": 439.9569114442851,
-        "y": 425.44822533595124
+        "x": 650.6916856747604,
+        "y": 148.63282002787804
       },
       "data": {
-        "formatStr": "<identity>{{node:out_1}}</identity><intention>{{node:out_2}}</intention><emotion>{{node:out_3}}</emotion>"
+        "formatStr": "<identity>{{node:out_1}}</identity><intention>{{node:out_2}}</intention><emotion>{{node:out_3}}</emotion>",
+        "runtimeParts": {
+          "out_1": "普通用户\\n",
+          "out_2": "获取信息\\n",
+          "out_3": "-1\\n"
+        }
       }
     },
     {
       "id": "out_4",
       "type": "outputNode",
       "position": {
-        "x": 525.061231403406,
-        "y": 591.2299041512946
+        "x": 1016.1761833333421,
+        "y": 157.71485399091907
       },
       "data": {
-        "text": ""
+        "text": "<identity>普通用户\\n</identity><intention>获取信息\\n</intention><emotion>-1\\n</emotion>"
       }
     }
   ],

@@ -40,7 +40,8 @@ export default function FormatNode({ data }: NodeProps) {
         <span className="text-sm font-bold text-gray-100">Format Prompt</span>
       </div>
 
-      <div className="p-3 text-xs text-gray-300 whitespace-pre-wrap leading-relaxed flex flex-wrap gap-1 max-h-[220px] overflow-y-auto">
+      {/* 移除了 flex flex-wrap，保留 whitespace-pre-wrap 使 \n 正确断行，并添加 break-words 防溢出 */}
+      <div className="p-3 text-xs text-gray-300 whitespace-pre-wrap leading-relaxed max-h-[220px] overflow-y-auto break-words">
         {parts.map((part, index) =>
           part.type === 'text' ? (
             <span key={`${part.type}-${index}`} className="text-gray-200">
@@ -49,7 +50,7 @@ export default function FormatNode({ data }: NodeProps) {
           ) : (
             <span
               key={`${part.type}-${index}`}
-              className="inline-flex items-center rounded-md px-2 py-0.5 bg-blue-500/20 border border-blue-400/60 text-blue-200"
+              className="inline-block align-middle mx-0.5 rounded px-1.5 py-0.5 bg-blue-500/20 border border-blue-400/60 text-blue-200 text-[10px]"
             >
               {nodeData.runtimeParts?.[part.value] || part.value}
             </span>

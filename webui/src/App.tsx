@@ -87,7 +87,7 @@ const nodePrefix: Record<NodeKind, string> = {
 };
 
 const defaultNodeData: Record<NodeKind, FormatNodeData | InferenceNodeData | OutputNodeData> = {
-  formatNode: { formatStr: 'User: Hello\\nAssistant:' },
+  formatNode: { formatStr: 'User: Hello\nAssistant:' },
   inferenceNode: {
     model: 'qwen2.5-0.5b',
     addSpecial: true,
@@ -111,7 +111,7 @@ const initNodes: AppNode[] = [
     id: 'format_1',
     type: 'formatNode',
     position: { x: 50, y: 150 },
-    data: { formatStr: 'User: Hello\\nAssistant:' }
+    data: { formatStr: 'User: Hello\nAssistant:' }
   },
   {
     id: 'infer_1',
@@ -816,27 +816,27 @@ function AppCanvas() {
     <div className="relative bg-gray-900 overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
       <div className={`absolute left-0 top-0 z-20 h-full transition-transform duration-300 ${isLeftSidebarCollapsed ? '-translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
         <Sidebar
-        allEdges={edges}
-        selectedNode={selectedNode}
-        selectedEdge={selectedEdge}
-        selectedNodeCount={selectedNodes.length}
-        selectedEdgeCount={selectedEdges.length}
-        isMultiSelection={isMultiSelection}
-        onDeleteNode={deleteNode}
-        onDeleteEdge={deleteEdge}
-        onDeleteSelection={deleteSelection}
-        onSaveNode={saveNode}
-        onSaveEdge={saveEdge}
-        onCopyNode={copySingleNode}
-        onCopySelection={copySelection}
-        onRun={runPipeline}
-        onStop={stopPipeline}
-        isRunning={isRunning}
-        graphConfig={graphConfig}
-        graphStatus={graphStatus}
-        onLoadGraphConfig={loadGraphConfig}
-        onSaveGraphConfig={saveGraphConfig}
-      />
+          allEdges={edges}
+          selectedNode={selectedNode}
+          selectedEdge={selectedEdge}
+          selectedNodeCount={selectedNodes.length}
+          selectedEdgeCount={selectedEdges.length}
+          isMultiSelection={isMultiSelection}
+          onDeleteNode={deleteNode}
+          onDeleteEdge={deleteEdge}
+          onDeleteSelection={deleteSelection}
+          onSaveNode={saveNode}
+          onSaveEdge={saveEdge}
+          onCopyNode={copySingleNode}
+          onCopySelection={copySelection}
+          onRun={runPipeline}
+          onStop={stopPipeline}
+          isRunning={isRunning}
+          graphConfig={graphConfig}
+          graphStatus={graphStatus}
+          onLoadGraphConfig={loadGraphConfig}
+          onSaveGraphConfig={saveGraphConfig}
+        />
         <button
           type="button"
           onClick={() => setIsLeftSidebarCollapsed((prev) => !prev)}
