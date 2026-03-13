@@ -69,13 +69,10 @@ namespace astra_rp
                 m_accumulated_content = m_output.output;
                 ASTRA_LOG_DEBUG("OutputNode " + m_id + " output=" + m_output.output);
 
-                if (m_bus)
+                if (m_bus && !m_output.output.empty())
                 {
-                    for (const char ch : m_output.output)
-                    {
-                        Str token(1, ch);
-                        m_bus->publish_token(m_id, token);
-                    }
+                    // 直接发布完整 UTF-8 字符串，避免按 byte 拆分导致中文乱码/断裂。
+                    m_bus->publish_token(m_id, m_output.output);
                 }
 
                 update_state(NodeState::FINISHED);
