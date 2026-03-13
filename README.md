@@ -1,95 +1,187 @@
-# AstraRP: 模块化智能体角色扮演流水线 (Modular Agent Pipeline for RP)
+# AstraRP · 模块化角色扮演智能体流水线
 
-**AstraRP** 是一个基于 **[llama.cpp](https://github.com/ggml-org/llama.cpp.git)** 的，专为深度角色扮演（Role-Play）设计的下一代智能体架构。
+<p align="center">
+  <img alt="AstraRP" src="https://img.shields.io/badge/AstraRP-Modular%20RP%20Pipeline-7c3aed?style=for-the-badge" />
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=node.js&logoColor=white" />
+  <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" />
+  <img alt="Vite" src="https://img.shields.io/badge/WebUI-Vite%20%2B%20React-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+  <img alt="License" src="https://img.shields.io/badge/License-ISC-blue?style=for-the-badge" />
+</p>
 
-不同于传统的大型单体模型（Monolithic LLMs），AstraRP 采用 **“模型即算子”** 的设计哲学，将复杂的 RP 逻辑拆解为由多个微型模型（0.5B - 7B）构成的有向无环图（DAG）流水线。
-
-### 核心理念：解构黑箱
-
-传统的 RP 模型往往面临 **“性能与硬件要求不成正比”**、**“人设崩坏难以定位原因”** 等痛点。AstraRP 通过以下方式解决：
-
-- **原子化任务**：将好感度计算、意图识别、心理状态更新等任务交由专精的 1.5B 级别小模型处理。
-- **透明化决策**：每一层的输出（JSON/数值）均可实时监控，彻底解决 RP 中的“逻辑黑箱”问题。
-- **异构加速**：针对 CPU 环境进行并行优化，通过调度多个小模型协同工作，达到甚至超越 70B 级别模型的逻辑深度。
+> **AstraRP** 是一个面向深度角色扮演（Role-Play）的“模型即算子”推理系统：将传统单体 LLM 的黑箱推理过程拆解为可观测、可替换、可编排的多节点流水线。
 
 ---
 
-## 架构设计 (Architecture)
+## ✨ 项目简介
 
-大体上，AstraRP 将角色逻辑分为五个核心层级：
+AstraRP 基于 `llama.cpp` 的高性能推理能力，提供 **C++ 核心引擎 + Node.js 服务层 + React 可视化编排界面** 的完整方案：
 
-1. **上下文层 (Context Layer)**:
-    - **输入**：原始上下文信息。
-    - **模型**：上下文总结专家模型及可选的嵌入式模型。
-    - **输出**：总结后的上下文信息。
-2. **感知层 (Perception Layer)**:
-    - **输入**：总结后的上下文信息。
-    - **模型**：0.5B - 1.5B 模型（如 Qwen-1.5B-Chat / Phi-3）。
-    - **输出**：意图标签、情绪向量、身份校验信息。
-3. **状态层 (Cognitive State Layer)**:
-    - **功能**：维护好感度、心情等可量化数值。
-    - **模型**：1.5B 状态更新模型。
-    - **输出**：更新后的角色状态剖面数据。
-4. **决策层 (Strategic Layer)**:
-    - **功能**：根据状态与感知结果，规划“下一步该做什么”。
-    - **模型**：1.5B - 7B 逻辑增强模型。
-    - **输出**：行动策略（如：`{动作: 避开眼神, 语调: 羞涩}`）。
-5. **表现层 (Presentation Layer)**:
-    - **功能**：最终文本润色与文笔渲染。
-    - **模型**：7B 专攻文笔的微调模型（如 Llama-3-8B 变体）。
+- 将 RP 推理分解为格式化、推理、输出等节点，并通过有向图连接执行。
+- 支持流式输出（NDJSON）、节点级日志广播（WebSocket）、图配置持久化。
+- 支持通过原生 Node Addon 调用 C++ 引擎，在保持性能的同时具备工程可扩展性。
 
 ---
 
-## 视觉化工作流 (Astra Canvas)
+## 🚀 为什么开发这个项目（开发原因）
 
-AstraRP 提供了一个基于 WebUI 的 **节点连接编辑器**：
+传统 RP 系统常见痛点：
 
-- **节点化管理**：每个微调好的模型都是一个节点，可以自由连接。
-- **实时调试**：点击任何节点之间的连线，即可查看流转的结构化数据。
-- **动态替换**：在不停止服务的情况下，热切换某个模块（例如将“好感度模块”从 v1 升级到 v2）。
+- **黑箱严重**：角色行为出错时很难定位是“理解错误”还是“状态更新错误”。
+- **成本偏高**：单体大模型在 CPU 或轻量环境下部署成本高、调优慢。
+- **迭代受限**：想替换某个子能力（如意图识别）常常需要重训整套模型。
 
----
-
-## 数据构造与可复现性 (Dataset Construction)
-
-本仓库不仅提供推理架构，还包含完整的 **数据生产工厂**，以确保微调结果的可复现性。
-
-### 数据流管线：
-
-- `scripts/gen_intent_data.py`: 基于 Self-Instruct 自动生成意图识别数据集。
-- `scripts/distill_cognition.py`: 利用大模型（如 GPT-4）对 RP 语料进行标注，提取心理状态变迁过程，用于小模型蒸馏。
-- `scripts/format_converter.py`: 将原始对话转换为 AstraRP 特有的结构化多轮训练格式。
+AstraRP 的目标是把“角色扮演能力”拆成可迭代的能力单元，让你可以像搭积木一样演化角色智能。
 
 ---
 
-## 路线图 (Roadmap)
+## 🧭 设计理念
 
-- [ ] **Phase 1: 验证可行性** (当前阶段)
-  - 微调 1.5B 意图识别器与 1.5B 心理状态模型。
-  - 构建基础 Pipeline 框架。
-- [ ] **Phase 2: 框架搭建与多语言绑定**
-  - 初步搭建可行流水线框架。
-  - 完成模型间参数对接与高扩展性接口设计。
-- [ ] **Phase 3: 节点编辑器开发**
-  - 开发可视化 WebUI。
-  - 实现模型节点的异步调度（Async Inference）。
-- [ ] **Phase 4: 社区生态**
-  - 开放 Hub，允许用户分享自己训练的特定“功能节点”（如：专攻“傲娇”性格的决策模型）。
+1. **可解释优先**：每条边流转的数据可观测，便于定位问题与回放分析。
+2. **模块化优先**：每个节点都是职责明确的算子，支持热替换与独立调优。
+3. **工程化优先**：从 CMake 构建到 Node 服务，再到可视化前端，保障可落地。
+4. **轻量部署优先**：面向 CPU 优化与小模型协同，追求性价比与可维护性。
 
 ---
 
-## 快速开始 (Quick Start)
+## 🏗️ 项目架构
 
-此处暂处于不可用状态！
-
-```bash
-git clone https://github.com/YourUsername/AstraRP.git
-cd AstraRP
+```mermaid
+flowchart LR
+    A[WebUI\nReact + Vite + XYFlow] -->|HTTP /api/run| B[Node.js Server\nExpress + WebSocket]
+    A -->|GET/POST graph config| B
+    B -->|Node Addon| C[C++ Core Engine\nPipeline / Scheduler / Inference]
+    C --> D[llama.cpp]
+    B --> E[graph_connections.json]
+    B --> F[config.json]
 ```
 
-## 图连接配置（Graph Connection Config）
+### 分层说明
 
-现在 `config.json` 支持可选的 `graph_connection` 配置块，用于统一管理图连接文件：
+- **WebUI 层**：可视化搭建节点图、查看日志、保存/加载图配置。
+- **Server 层**：负责 API、流式响应、图配置管理、LoRA 上传、日志广播。
+- **Core 层**：提供推理引擎、图调度器、节点执行模型与底层模型调用能力。
+
+---
+
+## 🗂️ 文件目录层次（精简版）
+
+```text
+AstraRP/
+├─ core/                     # C++ 核心引擎
+│  ├─ include/               # 头文件（core / infer / pipeline / utils）
+│  ├─ src/                   # 实现代码
+│  ├─ examples/              # 示例与验证程序
+│  ├─ CMakeLists.txt         # 核心构建配置
+│  └─ binding.cpp            # Node Addon 绑定
+├─ scripts/
+│  ├─ setup.js               # 初始化开发环境
+│  ├─ build.js               # 一键构建 core + addon
+│  └─ debug_token_routing_and_infer_guard.js
+├─ webui/                    # 前端可视化编排界面
+│  ├─ src/components/        # 侧边栏、日志等组件
+│  ├─ src/nodes/             # 各类可拖拽节点
+│  ├─ src/edges/             # 自定义边
+│  └─ src/store/             # Zustand 状态管理
+├─ server.js                 # Node 服务入口
+├─ config.json               # 全局推理/图配置
+├─ graph_connections.json    # 默认图连接配置
+└─ package.json              # 根脚本与依赖
+```
+
+---
+
+## 🧪 使用方法（Quick Start）
+
+### 1) 环境准备
+
+- Node.js 18+
+- CMake 3.18+
+- 可用 C++20 编译器（GCC/Clang/MSVC）
+- Git（用于子模块拉取）
+
+### 2) 初始化项目
+
+```bash
+git clone https://github.com/pjh456/AstraRP.git
+cd AstraRP
+npm run setup
+```
+
+### 3) 构建原生引擎与 Node Addon
+
+```bash
+npm run build
+```
+
+### 4) 启动服务
+
+```bash
+node server.js
+```
+
+### 5) 启动 WebUI（另开终端）
+
+```bash
+cd webui
+npm install
+npm run dev
+```
+
+---
+
+## 📜 npm run 可执行脚本
+
+### 根目录脚本（`/package.json`）
+
+| 脚本 | 命令 | 作用 |
+|---|---|---|
+| `npm run setup` | `node scripts/setup.js` | 同步子模块、安装依赖、清理旧 `binding.gyp` |
+| `npm run build` | `node scripts/build.js` | 编译 C++ core、自动生成 `binding.gyp` 并构建 addon |
+| `npm test` | `echo "Error: no test specified" && exit 1` | 预留测试脚本（当前未实现） |
+
+### WebUI 脚本（`/webui/package.json`）
+
+| 脚本 | 命令 | 作用 |
+|---|---|---|
+| `npm run dev` | `vite` | 启动前端开发服务器 |
+| `npm run build` | `tsc -b && vite build` | TypeScript 构建 + 前端打包 |
+| `npm run lint` | `eslint .` | 代码规范检查 |
+| `npm run preview` | `vite preview` | 预览打包产物 |
+
+---
+
+## 🔧 构建方案（Build Strategy）
+
+AstraRP 采用“两段式构建”：
+
+1. **C++ 核心构建**（CMake）
+   - 在 `core/` 下编译 `astrarp_lib` 与相关依赖。
+   - 关闭不必要的示例/测试目标以提升构建效率。
+   - 默认开启优化选项（如 `-O2`, `-march=native`）。
+
+2. **Node Addon 构建**（node-gyp）
+   - `scripts/build.js` 自动扫描 core 构建产物并生成 `binding.gyp`。
+   - 通过 `node-gyp configure/build` 生成 `astrarp_node.node`。
+   - 将动态库复制到 `build/Release`，保障运行时可加载。
+
+---
+
+## 🧱 技术栈选择
+
+- **推理核心**：C++20 + `llama.cpp`
+  - 原因：高性能、可控内存与线程模型，适合精细化推理管线。
+- **服务中台**：Node.js + Express + WebSocket
+  - 原因：接口开发效率高，便于流式协议与前端联动。
+- **可视化前端**：React + TypeScript + Vite + XYFlow + Zustand
+  - 原因：组件化与类型安全并重，适合构建可拖拽图编辑器。
+- **构建体系**：CMake + node-gyp
+  - 原因：跨平台 C++ 构建 + Node 原生扩展生态成熟。
+
+---
+
+## ⚙️ 图连接配置（Graph Connection Config）
+
+`config.json` 中可通过 `graph_connection` 管理图配置行为：
 
 ```json
 "graph_connection": {
@@ -101,20 +193,22 @@ cd AstraRP
 }
 ```
 
-- `auto_build_backend`: 当前端未携带图数据调用 `/api/run` 时，后端自动读取 `path` 指向的图配置并构建流水线。
-- `auto_load_frontend`: WebUI 启动后自动读取图配置并还原节点和连边。
-- `allow_frontend_save`: 允许在 WebUI 中将当前连图保存回配置文件。
+- `auto_build_backend`：当前端未传图时，后端自动读取本地图并执行。
+- `auto_load_frontend`：WebUI 启动时自动加载并还原图。
+- `allow_frontend_save`：允许前端直接保存图到配置文件。
 
 ---
 
-## 贡献与讨论
+## 🛣️ Roadmap
 
-AstraRP 仍在早期开发阶段。如果你对“分布式智能体架构”或“小模型驱动的高级 RP”感兴趣，欢迎提交 Issue 或 Pull Request。
-
-**项目负责人**: [pjh456](https://github.com/pjh456)
+- [ ] 完善各层节点模板与配置面板（格式化/推理/输出）
+- [ ] 增加更多节点类型（检索、记忆、角色状态更新）
+- [ ] 支持更完整的运行分析与链路追踪
+- [ ] 打通模型节点分享与社区生态
 
 ---
 
-### 为什么选择这个名字？
+## 🤝 贡献
 
-**Astra** 源自拉丁语“星辰”。在 AstraRP 中，每一个微小的模型就像一颗星辰，虽然微弱，但通过引力（流水线）连接在一起，便构成了璀璨的星系（完整的智能人格）。
+欢迎提 Issue / PR，一起把 RP 智能体工程做得更透明、更可控、更可复现。
+
