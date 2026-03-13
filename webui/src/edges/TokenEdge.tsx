@@ -1,4 +1,4 @@
-import { BaseEdge, getBezierPath } from '@xyflow/react';
+import { BaseEdge, getSmoothStepPath } from '@xyflow/react';
 import type { EdgeProps } from '@xyflow/react';
 
 export default function TokenEdge({
@@ -12,13 +12,15 @@ export default function TokenEdge({
   markerEnd,
   data
 }: EdgeProps) {
-  const [edgePath] = getBezierPath({
+  // 使用 getSmoothStepPath 替代 getBezierPath
+  const [edgePath] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
-    targetPosition
+    targetPosition,
+    borderRadius: 16, // 这里可以自定义拐角的圆角半径，默认通常是 5
   });
 
   const tokens = (data as { tokens?: string[] } | undefined)?.tokens ?? [];
