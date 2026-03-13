@@ -13,6 +13,9 @@ type InferenceNodeData = {
   topPMinKeep: number;
   seed: number;
   grammar: string;
+  loraName: string;
+  loraPath: string;
+  loraScale: number;
 };
 
 export default function InferenceNode({ data }: NodeProps) {
@@ -31,6 +34,7 @@ export default function InferenceNode({ data }: NodeProps) {
         <div className="flex justify-between"><span>Temp:</span><span className="text-gray-200">{nodeData.temperature ?? 0.7}</span></div>
         <div className="flex justify-between"><span>Top K:</span><span className="text-gray-200">{nodeData.topK ?? 40}</span></div>
         <div className="flex justify-between"><span>Top P:</span><span className="text-gray-200">{nodeData.topP ?? 0.9}</span></div>
+        <div className="flex justify-between"><span>LoRA:</span><span className="text-gray-200">{nodeData.loraName || 'None'}</span></div>
       </div>
 
       <Handle type="target" position={Position.Left} className="w-3 h-3 bg-purple-400 border-2 border-gray-800" />

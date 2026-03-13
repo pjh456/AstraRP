@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 
 type EditableValue = string | number | boolean;
 
@@ -60,6 +61,9 @@ function MultiSelectionEditor({ selectedNodeCount, selectedEdgeCount, onCopySele
 function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, onCopyNode, isRunning }: Pick<SidebarProps, 'selectedNode' | 'allEdges' | 'onDeleteNode' | 'onSaveNode' | 'onCopyNode' | 'isRunning'>) {
   const editableNodeData = toEditableNodeData(selectedNode?.data as Record<string, unknown> | undefined);
   const [draftData, setDraftData] = useState<Record<string, EditableValue>>(editableNodeData);
+  const [uploadingLora, setUploadingLora] = useState(false);
+  const [loraError, setLoraError] = useState('');
+  const loraDirInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!selectedNode) return null;
 
@@ -88,6 +92,61 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
   };
 
   const hasChanges = JSON.stringify(editableNodeData) !== JSON.stringify(draftData);
+
+  const handleSelectLoraDir = () => {
+    if (isRunning || uploadingLora) return;
+    loraDirInputRef.current?.click();
+  };
+
+  const removeLora = () => {
+    setLoraError('');
+    setDraftData((prev) => ({ ...prev, loraName: '', loraPath: '' }));
+  };
+
+  const handleLoraDirPicked = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    event.target.value = '';
+    if (!files || files.length === 0) return;
+
+    const candidates = Array.from(files).filter((file) => file.name.toLowerCase().endsWith('.gguf'));
+    if (candidates.length === 0) {
+      setLoraError('所选目录未找到 .gguf LoRA 文件');
+      return;
+    }
+
+    const file = candidates[0];
+    const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || '';
+    const folderName = relativePath.split('/')[0] || file.name.replace(/\.gguf$/i, '');
+
+    setUploadingLora(true);
+    setLoraError('');
+
+    try {
+      const form = new FormData();
+      form.append('loraFile', file);
+      form.append('loraName', folderName);
+
+      const response = await fetch('http://localhost:3000/api/lora/upload', {
+        method: 'POST',
+        body: form
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'LoRA 上传失败');
+      }
+
+      setDraftData((prev) => ({
+        ...prev,
+        loraName: String(data.loraName || folderName),
+        loraPath: String(data.loraPath || '')
+      }));
+    } catch (error) {
+      setLoraError(error instanceof Error ? error.message : 'LoRA 上传失败');
+    } finally {
+      setUploadingLora(false);
+    }
+  };
 
   const renderInferenceField = (key: string, label: string) => {
     const value = draftData[key];
@@ -128,7 +187,8 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
     { key: 'topP', label: 'Top P' },
     { key: 'topPMinKeep', label: 'Top P Min Keep' },
     { key: 'seed', label: 'Seed' },
-    { key: 'grammar', label: 'Grammar' }
+    { key: 'grammar', label: 'Grammar' },
+    { key: 'loraScale', label: 'LoRA Scale' }
   ];
 
   return (
@@ -157,6 +217,41 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
                 </button>
               )) : <span className="text-xs text-gray-500">暂无上游节点</span>}
             </div>
+          </div>
+        )}
+
+        {selectedNode.type === 'inferenceNode' && (
+          <div className="space-y-2">
+            <label className="text-xs text-gray-400">LoRA</label>
+            <input
+              ref={loraDirInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+              onChange={handleLoraDirPicked}
+            />
+            {draftData.loraName && draftData.loraPath ? (
+              <button
+                type="button"
+                disabled={isRunning || uploadingLora}
+                onClick={removeLora}
+                className="rounded-xl px-3 py-2 bg-emerald-500/20 border border-emerald-400/60 text-emerald-200 text-sm"
+                title="点击移除 LoRA"
+              >
+                {String(draftData.loraName)}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isRunning || uploadingLora}
+                onClick={handleSelectLoraDir}
+                className={`rounded px-3 py-2 text-sm ${isRunning || uploadingLora ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
+              >
+                {uploadingLora ? '读取 LoRA 中...' : '选择 LoRA 目录'}
+              </button>
+            )}
+            {loraError && <p className="text-xs text-red-400">{loraError}</p>}
           </div>
         )}
 
@@ -191,8 +286,8 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
           </button>
           <button
             onClick={() => onSaveNode(selectedNode.id, draftData)}
-            disabled={isRunning || !hasChanges}
-            className={`col-span-2 py-2 rounded text-sm font-medium ${(isRunning || !hasChanges) ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            disabled={isRunning || !hasChanges || uploadingLora}
+            className={`col-span-2 py-2 rounded text-sm font-medium ${(isRunning || !hasChanges || uploadingLora) ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
           >
             保存属性
           </button>

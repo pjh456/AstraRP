@@ -43,6 +43,9 @@ type InferenceNodeData = {
   topPMinKeep: number;
   seed: number;
   grammar: string;
+  loraName: string;
+  loraPath: string;
+  loraScale: number;
 };
 
 type OutputNodeData = {
@@ -80,7 +83,10 @@ const defaultNodeData: Record<NodeKind, FormatNodeData | InferenceNodeData | Out
     topP: 0.9,
     topPMinKeep: 1,
     seed: -1,
-    grammar: ''
+    grammar: '',
+    loraName: '',
+    loraPath: '',
+    loraScale: 1
   },
   outputNode: { text: '' }
 };
@@ -106,7 +112,10 @@ const initNodes: AppNode[] = [
       topP: 0.9,
       topPMinKeep: 1,
       seed: -1,
-      grammar: ''
+      grammar: '',
+      loraName: '',
+      loraPath: '',
+      loraScale: 1
     }
   },
   {

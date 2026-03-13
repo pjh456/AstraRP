@@ -7,6 +7,7 @@
 #include "core/global_config.hpp"
 #include "core/tokenizer.hpp"
 #include "core/model_manager.hpp"
+#include "core/lora_manager.hpp"
 #include "pipeline/graph.hpp"
 #include "pipeline/scheduler.hpp"
 #include "pipeline/event_bus.hpp"
@@ -456,6 +457,44 @@ public:
             }
         }
 
+        Str lora_path;
+        Str lora_name;
+        float lora_scale = 1.0f;
+
+        if (info.Length() > 1 && info[1].IsObject())
+        {
+            Napi::Object cfg = info[1].As<Napi::Object>();
+            if (cfg.Has("loraPath"))
+            {
+                auto v = cfg.Get("loraPath");
+                if (v.IsString())
+                    lora_path = v.As<Napi::String>().Utf8Value();
+            }
+            if (cfg.Has("loraName"))
+            {
+                auto v = cfg.Get("loraName");
+                if (v.IsString())
+                    lora_name = v.As<Napi::String>().Utf8Value();
+            }
+            if (cfg.Has("loraScale"))
+            {
+                auto v = cfg.Get("loraScale");
+                if (v.IsNumber())
+                {
+                    const double raw = v.As<Napi::Number>().DoubleValue();
+                    if (std::isfinite(raw))
+                    {
+                        auto parsed = static_cast<float>(raw);
+                        if (parsed < 0.0f)
+                            parsed = 0.0f;
+                        if (parsed > 16.0f)
+                            parsed = 16.0f;
+                        lora_scale = parsed;
+                    }
+                }
+            }
+        }
+
         auto nodeRes = pipeline::InferenceNode::default_create(id, tp, dp, sp, m_bus);
         if (nodeRes.is_err())
         {
@@ -471,6 +510,27 @@ public:
                     return ""; // 兜底防止空指针
                 return inputs.begin()->second.output;
             });
+
+        if (!lora_path.empty())
+        {
+            auto modelRes = core::ModelManager::instance().load_config_model();
+            if (modelRes.is_err())
+            {
+                Napi::Error::New(env, modelRes.unwrap_err().to_string()).ThrowAsJavaScriptException();
+                return env.Undefined();
+            }
+
+            const Str resolved_name = lora_name.empty() ? lora_path : lora_name;
+            auto loraRes = core::LoRAManager::instance().load(modelRes.unwrap(), lora_path, resolved_name);
+            if (loraRes.is_err())
+            {
+                Napi::Error::New(env, loraRes.unwrap_err().to_string()).ThrowAsJavaScriptException();
+                return env.Undefined();
+            }
+
+            infer_node.set_lora(loraRes.unwrap(), lora_scale);
+        }
+
         auto node = std::make_shared<pipeline::InferenceNode>(infer_node);
         m_graph->add_node(node);
 

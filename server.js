@@ -2,6 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
+const fs = require('fs');
+const fsp = fs.promises;
+const crypto = require('crypto');
+const multer = require('multer');
 const WebSocket = require('ws');
 
 // 引入 C++ 引擎
@@ -21,12 +25,51 @@ const sanitizeInferenceConfig = (raw) => {
         topP: Number.isFinite(data.topP) ? data.topP : undefined,
         topPMinKeep: Number.isFinite(data.topPMinKeep) ? data.topPMinKeep : undefined,
         seed: Number.isFinite(data.seed) ? data.seed : undefined,
-        grammar: typeof data.grammar === 'string' ? data.grammar : undefined
+        grammar: typeof data.grammar === 'string' ? data.grammar : undefined,
+        loraName: typeof data.loraName === 'string' ? data.loraName : undefined,
+        loraPath: typeof data.loraPath === 'string' ? data.loraPath : undefined,
+        loraScale: Number.isFinite(data.loraScale) ? data.loraScale : undefined
     };
 };
 
 app.use(cors());
 app.use(express.json());
+
+
+const loraUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 1024 * 1024 * 1024 * 2 }
+});
+
+const safeName = (name) => String(name || '').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+app.post('/api/lora/upload', loraUpload.single('loraFile'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Missing loraFile' });
+        }
+
+        const fileName = safeName(req.file.originalname || 'adapter.gguf');
+        if (!fileName.toLowerCase().endsWith('.gguf')) {
+            return res.status(400).json({ error: 'LoRA file must be .gguf' });
+        }
+
+        const loraName = safeName(req.body?.loraName || fileName.replace(/\.gguf$/i, ''));
+        const runId = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+        const runtimeRoot = path.resolve('./runtime_loras');
+        const targetDir = path.join(runtimeRoot, runId);
+        await fsp.mkdir(targetDir, { recursive: true });
+
+        const targetPath = path.join(targetDir, fileName);
+        await fsp.writeFile(targetPath, req.file.buffer);
+
+        return res.json({ loraName, loraPath: targetPath });
+    } catch (error) {
+        console.error('LoRA upload failed:', error);
+        return res.status(500).json({ error: 'LoRA upload failed' });
+    }
+});
 
 // 创建 HTTP 服务器以便挂载 WebSocket
 const server = http.createServer(app);
