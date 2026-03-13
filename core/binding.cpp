@@ -1,4 +1,5 @@
 #include <napi.h>
+#include <algorithm>
 #include <thread>
 #include <memory>
 #include <vector>
@@ -508,7 +509,22 @@ public:
             {
                 if (inputs.empty())
                     return ""; // 兜底防止空指针
-                return inputs.begin()->second.output;
+
+                Vec<Str> parent_ids;
+                parent_ids.reserve(inputs.size());
+                for (const auto &[parent_id, payload] : inputs)
+                {
+                    (void)payload;
+                    parent_ids.push_back(parent_id);
+                }
+                std::sort(parent_ids.begin(), parent_ids.end());
+
+                Str prompt;
+                for (const auto &parent_id : parent_ids)
+                {
+                    prompt += inputs.at(parent_id).output;
+                }
+                return prompt;
             });
 
         if (!lora_path.empty())
