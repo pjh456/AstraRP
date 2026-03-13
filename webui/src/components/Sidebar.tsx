@@ -21,6 +21,16 @@ interface SidebarProps {
   onRun: () => void;
   onStop: () => void;
   isRunning: boolean;
+  graphConfig: {
+    enabled: boolean;
+    path: string;
+    autoBuildBackend: boolean;
+    autoLoadFrontend: boolean;
+    allowFrontendSave: boolean;
+  } | null;
+  graphStatus: string;
+  onLoadGraphConfig: () => void;
+  onSaveGraphConfig: () => void;
 }
 
 const toEditableNodeData = (data: Record<string, unknown> | undefined): Record<string, EditableValue> => {
@@ -363,7 +373,11 @@ export default function Sidebar(props: SidebarProps) {
     onCopySelection,
     onRun,
     onStop,
-    isRunning
+    isRunning,
+    graphConfig,
+    graphStatus,
+    onLoadGraphConfig,
+    onSaveGraphConfig
   } = props;
 
   return (
@@ -406,6 +420,27 @@ export default function Sidebar(props: SidebarProps) {
       </div>
 
       <div className="p-4 border-t border-gray-800 space-y-2">
+        <div className="rounded border border-gray-700 bg-gray-800/60 p-3 space-y-2">
+          <div className="text-xs text-gray-400">图连接配置</div>
+          <div className="text-xs text-gray-500 break-all">{graphStatus}</div>
+          <div className="flex gap-2">
+            <button
+              onClick={onLoadGraphConfig}
+              disabled={isRunning || !graphConfig?.enabled}
+              className={`flex-1 py-2 rounded text-xs font-medium ${(isRunning || !graphConfig?.enabled) ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-700 text-white'}`}
+            >
+              读取连图配置
+            </button>
+            <button
+              onClick={onSaveGraphConfig}
+              disabled={isRunning || !graphConfig?.enabled || !graphConfig?.allowFrontendSave}
+              className={`flex-1 py-2 rounded text-xs font-medium ${(isRunning || !graphConfig?.enabled || !graphConfig?.allowFrontendSave) ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
+            >
+              保存连图配置
+            </button>
+          </div>
+        </div>
+
         {!isRunning ? (
           <button onClick={onRun} className="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-medium">
             ▶ Run

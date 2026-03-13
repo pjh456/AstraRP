@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -64,6 +64,14 @@ type TokenEdgeData = {
 type AppEdge = Edge<TokenEdgeData>;
 
 type NodeKind = 'formatNode' | 'inferenceNode' | 'outputNode';
+
+type GraphConnectionConfig = {
+  enabled: boolean;
+  path: string;
+  autoBuildBackend: boolean;
+  autoLoadFrontend: boolean;
+  allowFrontendSave: boolean;
+};
 
 const nodePrefix: Record<NodeKind, string> = {
   formatNode: 'format',
@@ -181,6 +189,8 @@ function AppCanvas() {
   const { screenToFlowPosition } = useReactFlow<AppNode, AppEdge>();
   const outputBuffers = useRef<Record<string, string>>({});
   const tokenRoutingMode = useRef<'unknown' | 'inferOnly' | 'outputEmits'>('unknown');
+  const [graphConfig, setGraphConfig] = useState<GraphConnectionConfig | null>(null);
+  const [graphStatus, setGraphStatus] = useState('未读取图连接配置');
 
   const nodeTypes = useMemo(
     () => ({
@@ -565,6 +575,100 @@ function AppCanvas() {
     onEdgesChange(changes);
   };
 
+  const normalizeGraphNode = (node: Partial<AppNode> & { type?: string; id?: string }): AppNode | null => {
+    if (!node?.id || !node?.type || !['formatNode', 'inferenceNode', 'outputNode'].includes(node.type)) {
+      return null;
+    }
+
+    const kind = node.type as NodeKind;
+
+    return {
+      id: node.id,
+      type: kind,
+      position: node.position ?? { x: 80, y: 80 },
+      data: { ...(defaultNodeData[kind] as Record<string, unknown>), ...((node.data as Record<string, unknown>) ?? {}) }
+    } as AppNode;
+  };
+
+  const normalizeGraphEdge = (edge: Partial<AppEdge>): AppEdge | null => {
+    if (!edge?.source || !edge?.target) return null;
+    return {
+      id: `${edge.source}-${edge.target}`,
+      source: edge.source,
+      target: edge.target,
+      type: 'tokenEdge',
+      style: { stroke: '#a855f7', strokeWidth: 2, strokeDasharray: '5,5' },
+      animated: false,
+      data: { tokens: [] }
+    };
+  };
+
+  const applyGraph = useCallback((payload: { nodes?: Partial<AppNode>[]; edges?: Partial<AppEdge>[] }) => {
+    const normalizedNodes = (payload.nodes ?? []).map(normalizeGraphNode).filter(Boolean) as AppNode[];
+    const normalizedEdges = (payload.edges ?? []).map(normalizeGraphEdge).filter(Boolean) as AppEdge[];
+    if (normalizedNodes.length === 0) {
+      throw new Error('图配置中没有可用节点');
+    }
+    setNodes(normalizedNodes);
+    setEdges(normalizedEdges);
+  }, [setEdges, setNodes]);
+
+  const loadGraphConfig = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/graph-config');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || '读取图连接配置失败');
+
+      setGraphConfig(data.config ?? null);
+      applyGraph(data.graph ?? {});
+      setGraphStatus(`已读取图配置：${data.config?.path || ''}`);
+    } catch (error) {
+      setGraphStatus(error instanceof Error ? error.message : '读取图连接配置失败');
+    }
+  }, [applyGraph]);
+
+  const saveGraphConfig = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/graph-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nodes: nodes.map((node) => ({ id: node.id, type: node.type, position: node.position, data: node.data })),
+          edges: edges.map((edge) => ({ source: edge.source, target: edge.target }))
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || '保存图连接配置失败');
+      setGraphStatus(`图连接配置已保存至：${data.path || ''}`);
+    } catch (error) {
+      setGraphStatus(error instanceof Error ? error.message : '保存图连接配置失败');
+    }
+  }, [edges, nodes]);
+
+  const refreshGraphConfig = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/graph-config');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || '读取图连接配置失败');
+      setGraphConfig(data.config ?? null);
+      setGraphStatus(`图连接配置可用：${data.config?.path || ''}`);
+    } catch (error) {
+      setGraphConfig(null);
+      setGraphStatus(error instanceof Error ? error.message : '读取图连接配置失败');
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshGraphConfig();
+  }, [refreshGraphConfig]);
+
+  useEffect(() => {
+    if (graphConfig?.autoLoadFrontend) {
+      void loadGraphConfig();
+    }
+  }, [graphConfig?.autoLoadFrontend, loadGraphConfig]);
+
   const runPipeline = async () => {
     if (isRunning) return;
     setIsRunning(true);
@@ -681,6 +785,10 @@ function AppCanvas() {
         onRun={runPipeline}
         onStop={stopPipeline}
         isRunning={isRunning}
+        graphConfig={graphConfig}
+        graphStatus={graphStatus}
+        onLoadGraphConfig={loadGraphConfig}
+        onSaveGraphConfig={saveGraphConfig}
       />
       <div ref={paneRef} className="flex-1 h-full relative" onClick={() => setContextMenu(null)}>
         <ReactFlow

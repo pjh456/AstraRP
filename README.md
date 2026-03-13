@@ -87,6 +87,24 @@ git clone https://github.com/YourUsername/AstraRP.git
 cd AstraRP
 ```
 
+## 图连接配置（Graph Connection Config）
+
+现在 `config.json` 支持可选的 `graph_connection` 配置块，用于统一管理图连接文件：
+
+```json
+"graph_connection": {
+  "enabled": true,
+  "path": "./graph_connections.json",
+  "auto_build_backend": true,
+  "auto_load_frontend": false,
+  "allow_frontend_save": true
+}
+```
+
+- `auto_build_backend`: 当前端未携带图数据调用 `/api/run` 时，后端自动读取 `path` 指向的图配置并构建流水线。
+- `auto_load_frontend`: WebUI 启动后自动读取图配置并还原节点和连边。
+- `allow_frontend_save`: 允许在 WebUI 中将当前连图保存回配置文件。
+
 ---
 
 ## 贡献与讨论

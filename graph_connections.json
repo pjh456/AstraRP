@@ -1,0 +1,40 @@
+{
+  "nodes": [
+    {
+      "id": "format_1",
+      "type": "formatNode",
+      "position": { "x": 50, "y": 150 },
+      "data": { "formatStr": "User: Hello\\nAssistant:" }
+    },
+    {
+      "id": "infer_1",
+      "type": "inferenceNode",
+      "position": { "x": 350, "y": 130 },
+      "data": {
+        "model": "qwen2.5-0.5b",
+        "addSpecial": true,
+        "parseSpecial": true,
+        "maxTokens": 150,
+        "temperature": 0.7,
+        "topK": 40,
+        "topP": 0.9,
+        "topPMinKeep": 1,
+        "seed": -1,
+        "grammar": "",
+        "loraName": "",
+        "loraPath": "",
+        "loraScale": 1
+      }
+    },
+    {
+      "id": "out_1",
+      "type": "outputNode",
+      "position": { "x": 700, "y": 130 },
+      "data": { "text": "" }
+    }
+  ],
+  "edges": [
+    { "source": "format_1", "target": "infer_1" },
+    { "source": "infer_1", "target": "out_1" }
+  ]
+}

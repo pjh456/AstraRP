@@ -13,6 +13,59 @@ const astra = require('./build/Release/astrarp_node.node');
 
 const app = express();
 
+const configPath = path.resolve('./config.json');
+
+const normalizeGraphConnectionConfig = (raw) => {
+    const data = raw && typeof raw === 'object' ? raw : {};
+    const configuredPath = typeof data.path === 'string' && data.path.trim() ? data.path : './graph_connections.json';
+    return {
+        enabled: data.enabled !== false,
+        path: path.resolve(configuredPath),
+        autoBuildBackend: data.auto_build_backend !== false,
+        autoLoadFrontend: data.auto_load_frontend === true,
+        allowFrontendSave: data.allow_frontend_save !== false
+    };
+};
+
+const loadGlobalConfig = () => {
+    try {
+        const raw = fs.readFileSync(configPath, 'utf-8');
+        return JSON.parse(raw);
+    } catch (error) {
+        console.warn('Failed to read config.json as JSON, fallback to defaults:', error?.message || error);
+        return {};
+    }
+};
+
+const globalJsonConfig = loadGlobalConfig();
+const graphConnectionConfig = normalizeGraphConnectionConfig(globalJsonConfig.graph_connection);
+
+const parseGraphPayload = (raw) => {
+    if (!raw || typeof raw !== 'object') {
+        throw new Error('Graph config payload must be an object.');
+    }
+
+    const nodes = Array.isArray(raw.nodes) ? raw.nodes : [];
+    const edges = Array.isArray(raw.edges) ? raw.edges : [];
+
+    return {
+        nodes,
+        edges
+    };
+};
+
+const readGraphConfigFromFile = async () => {
+    const raw = await fsp.readFile(graphConnectionConfig.path, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return parseGraphPayload(parsed);
+};
+
+const writeGraphConfigToFile = async (graphPayload) => {
+    const normalized = parseGraphPayload(graphPayload);
+    await fsp.mkdir(path.dirname(graphConnectionConfig.path), { recursive: true });
+    await fsp.writeFile(graphConnectionConfig.path, JSON.stringify(normalized, null, 2), 'utf-8');
+};
+
 
 
 const safelyInvokePipelineMethod = (pipeline, methodName, ...args) => {
@@ -109,7 +162,6 @@ try {
         }
     });
 
-    const configPath = path.resolve("./config.json");
     console.log("Initializing Astra Engine with:", configPath);
     astra.initSystem(configPath);
     console.log("Astra Engine initialized successfully.");
@@ -118,9 +170,54 @@ try {
     process.exit(1);
 }
 
+app.get('/api/graph-config', async (_req, res) => {
+    if (!graphConnectionConfig.enabled) {
+        return res.status(404).json({ error: 'Graph connection config is disabled in global config.' });
+    }
+
+    try {
+        const graph = await readGraphConfigFromFile();
+        return res.json({
+            config: {
+                ...graphConnectionConfig,
+                path: graphConnectionConfig.path
+            },
+            graph
+        });
+    } catch (error) {
+        const code = error && error.code === 'ENOENT' ? 404 : 500;
+        return res.status(code).json({
+            error: code === 404 ? 'Graph config file not found.' : 'Failed to read graph config.',
+            config: {
+                ...graphConnectionConfig,
+                path: graphConnectionConfig.path
+            }
+        });
+    }
+});
+
+app.post('/api/graph-config', async (req, res) => {
+    if (!graphConnectionConfig.enabled) {
+        return res.status(404).json({ error: 'Graph connection config is disabled in global config.' });
+    }
+    if (!graphConnectionConfig.allowFrontendSave) {
+        return res.status(403).json({ error: 'Saving graph config from frontend is disabled.' });
+    }
+
+    try {
+        await writeGraphConfigToFile(req.body || {});
+        return res.json({ ok: true, path: graphConnectionConfig.path });
+    } catch (error) {
+        return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to save graph config.' });
+    }
+});
+
 // 2. 提供流式推理 API
 app.post('/api/run', (req, res) => {
-    const { nodes = [], edges = [] } = req.body || {};
+    const hasGraphPayload = Array.isArray(req.body?.nodes);
+
+    const runWithGraph = (graph) => {
+        const { nodes = [], edges = [] } = graph || {};
 
     // 明确写入流式协议头，关闭缓存，并防止 Express 内部自动干扰
     res.writeHead(200, {
@@ -229,6 +326,19 @@ app.post('/api/run', (req, res) => {
         // 推理结束，手动释放 C++ 内存，归还大模型 KV Context
         safelyInvokePipelineMethod(pipeline, "dispose");
     });
+    };
+
+    if (!hasGraphPayload && graphConnectionConfig.enabled && graphConnectionConfig.autoBuildBackend) {
+        readGraphConfigFromFile()
+            .then((graph) => runWithGraph(graph))
+            .catch((error) => {
+                res.write(JSON.stringify({ error: `Failed to auto load graph config: ${error.message || error}` }) + '\n');
+                res.end();
+            });
+        return;
+    }
+
+    runWithGraph(req.body || {});
 });
 
 server.listen(3000, () => {
