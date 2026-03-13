@@ -1,5 +1,4 @@
 #include <napi.h>
-#include <nlohmann/json.hpp>
 #include <thread>
 #include <memory>
 #include <vector>
@@ -16,6 +15,69 @@
 #include "utils/logger.hpp"
 
 using namespace astra_rp;
+
+
+static Vec<pipeline::FormatNode::FormatPart>
+ParseFormatParts(const Str &format_spec)
+{
+    Vec<pipeline::FormatNode::FormatPart> parts;
+
+    const Str prefix = "{{node:";
+    const Str suffix = "}}";
+    size_t cursor = 0;
+
+    while (cursor < format_spec.size())
+    {
+        size_t start = format_spec.find(prefix, cursor);
+        if (start == Str::npos)
+        {
+            if (cursor < format_spec.size())
+            {
+                parts.push_back({
+                    pipeline::FormatNode::FormatPart::Type::TEXT,
+                    format_spec.substr(cursor)});
+            }
+            break;
+        }
+
+        if (start > cursor)
+        {
+            parts.push_back({
+                pipeline::FormatNode::FormatPart::Type::TEXT,
+                format_spec.substr(cursor, start - cursor)});
+        }
+
+        size_t node_id_start = start + prefix.size();
+        size_t end = format_spec.find(suffix, node_id_start);
+        if (end == Str::npos)
+        {
+            parts.push_back({
+                pipeline::FormatNode::FormatPart::Type::TEXT,
+                format_spec.substr(start)});
+            cursor = format_spec.size();
+            break;
+        }
+
+        Str node_id = format_spec.substr(node_id_start, end - node_id_start);
+        if (!node_id.empty())
+        {
+            parts.push_back({
+                pipeline::FormatNode::FormatPart::Type::NODE,
+                std::move(node_id)});
+        }
+
+        cursor = end + suffix.size();
+    }
+
+    if (parts.empty())
+    {
+        parts.push_back({
+            pipeline::FormatNode::FormatPart::Type::TEXT,
+            format_spec});
+    }
+
+    return parts;
+}
 
 // 1. 暴露全局初始化方法
 Napi::Value InitSystem(const Napi::CallbackInfo &info)
@@ -259,46 +321,7 @@ public:
         std::string id = info[0].As<Napi::String>().Utf8Value();
         std::string format_spec = info[1].As<Napi::String>().Utf8Value();
 
-        Vec<pipeline::FormatNode::FormatPart> parts;
-        try
-        {
-            auto json = nlohmann::json::parse(format_spec);
-            if (json.is_array())
-            {
-                for (const auto &item : json)
-                {
-                    if (!item.is_object())
-                        continue;
-
-                    const auto type = item.value("type", "text");
-                    if (type == "node")
-                    {
-                        parts.push_back({
-                            pipeline::FormatNode::FormatPart::Type::NODE,
-                            item.value("id", Str())});
-                    }
-                    else
-                    {
-                        parts.push_back({
-                            pipeline::FormatNode::FormatPart::Type::TEXT,
-                            item.value("value", Str())});
-                    }
-                }
-            }
-        }
-        catch (...)
-        {
-            parts.push_back({
-                pipeline::FormatNode::FormatPart::Type::TEXT,
-                format_spec});
-        }
-
-        if (parts.empty())
-        {
-            parts.push_back({
-                pipeline::FormatNode::FormatPart::Type::TEXT,
-                format_spec});
-        }
+        auto parts = ParseFormatParts(format_spec);
 
         auto formatter =
             [parts = std::move(parts)](const HashMap<Str, pipeline::NodePayload> &inputs) -> Str
