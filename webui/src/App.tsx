@@ -264,10 +264,13 @@ function AppCanvas() {
     const outputIncrements = new Map<string, number>();
 
     if (tokenRoutingMode.current === 'inferOnly') {
-      for (const [id, count] of nodePathCount.entries()) {
-        const node = nodeById.get(id);
-        if (node?.type === 'outputNode' && count > 0) {
-          outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
+      const shouldWriteOutputs = emittingNode.type === 'inferenceNode';
+      if (shouldWriteOutputs) {
+        for (const [id, count] of nodePathCount.entries()) {
+          const node = nodeById.get(id);
+          if (node?.type === 'outputNode' && count > 0) {
+            outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
+          }
         }
       }
     } else {
