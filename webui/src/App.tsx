@@ -73,6 +73,13 @@ type GraphConnectionConfig = {
   allowFrontendSave: boolean;
 };
 
+const MAX_EDGE_TOKENS = 24;
+
+type TokenEvent = {
+  nodeId: string;
+  char: string;
+};
+
 const nodePrefix: Record<NodeKind, string> = {
   formatNode: 'format',
   inferenceNode: 'infer',
@@ -192,6 +199,13 @@ function AppCanvas() {
   const [graphConfig, setGraphConfig] = useState<GraphConnectionConfig | null>(null);
   const [graphStatus, setGraphStatus] = useState('未读取图连接配置');
 
+  const tokenQueueRef = useRef<TokenEvent[]>([]);
+  const flushRafRef = useRef<number | null>(null);
+  const nodeByIdRef = useRef<Map<string, AppNode>>(new Map());
+  const adjacencyRef = useRef<Map<string, string[]>>(new Map());
+  const edgeIdByKeyRef = useRef<Map<string, string>>(new Map());
+  const formatRuntimeRef = useRef<Record<string, Record<string, string>>>({});
+
   const nodeTypes = useMemo(
     () => ({
       inferenceNode: InferenceNode,
@@ -209,149 +223,149 @@ function AppCanvas() {
   const selectedEdge = selectedEdges.length === 1 && selectedNodes.length === 0 ? selectedEdges[0] : null;
   const isMultiSelection = selectedNodes.length + selectedEdges.length > 1;
 
-  const handleIncomingToken = (nodeId: string, char: string) => {
-    const nodeById = new Map(nodes.map((node) => [node.id, node]));
-    const adjacencySet = new Map<string, Set<string>>();
-    for (const edge of edges) {
-      if (!adjacencySet.has(edge.source)) adjacencySet.set(edge.source, new Set());
-      adjacencySet.get(edge.source)?.add(edge.target);
-    }
-    const adjacency = new Map<string, string[]>(
-      Array.from(adjacencySet.entries()).map(([source, targets]) => [source, Array.from(targets)])
-    );
+  const flushTokenQueue = useCallback(() => {
+    flushRafRef.current = null;
 
-    const emittingNode = nodeById.get(nodeId);
-    if (!emittingNode) return;
+    if (tokenQueueRef.current.length === 0) return;
 
-    let switchedToOutputMode = false;
+    const events = tokenQueueRef.current.splice(0, tokenQueueRef.current.length);
+    const nodeById = nodeByIdRef.current;
+    const adjacency = adjacencyRef.current;
+    const edgeIdByKey = edgeIdByKeyRef.current;
 
-    if (emittingNode.type === 'outputNode' && tokenRoutingMode.current !== 'outputEmits') {
-      tokenRoutingMode.current = 'outputEmits';
-      outputBuffers.current = {};
-      switchedToOutputMode = true;
-    } else if (tokenRoutingMode.current === 'unknown') {
-      tokenRoutingMode.current = 'inferOnly';
-    }
+    const touchedOutputs = new Set<string>();
+    const touchedFormats = new Set<string>();
+    const edgeTokenAppends = new Map<string, string[]>();
 
-    const shouldPropagateThroughOutputs =
-      tokenRoutingMode.current === 'inferOnly' || emittingNode.type === 'outputNode';
+    for (const { nodeId, char } of events) {
+      const emittingNode = nodeById.get(nodeId);
+      if (!emittingNode) continue;
 
-    const nodePathCount = new Map<string, number>();
-    const edgePathCount = new Map<string, number>();
-
-    const pending = new Map<string, number>();
-    pending.set(nodeId, 1);
-
-    let guard = 0;
-
-    while (pending.size > 0 && guard < 10000) {
-      guard += 1;
-      const [current, delta] = pending.entries().next().value as [string, number];
-      pending.delete(current);
-      if (delta <= 0) continue;
-
-      const currentNode = nodeById.get(current);
-      if (!currentNode) continue;
-
-      nodePathCount.set(current, (nodePathCount.get(current) ?? 0) + delta);
-
-      const nextNodes = adjacency.get(current) ?? [];
-      for (const next of nextNodes) {
-        const edgeKey = `${current}->${next}`;
-        edgePathCount.set(edgeKey, (edgePathCount.get(edgeKey) ?? 0) + delta);
-
-        const nextNode = nodeById.get(next);
-        if (!nextNode) continue;
-
-        if (nextNode.type === 'outputNode' && !shouldPropagateThroughOutputs) {
-          continue;
-        }
-
-        pending.set(next, (pending.get(next) ?? 0) + delta);
+      let switchedToOutputMode = false;
+      if (emittingNode.type === 'outputNode' && tokenRoutingMode.current !== 'outputEmits') {
+        tokenRoutingMode.current = 'outputEmits';
+        outputBuffers.current = {};
+        switchedToOutputMode = true;
+      } else if (tokenRoutingMode.current === 'unknown') {
+        tokenRoutingMode.current = 'inferOnly';
       }
-    }
 
-    const outputIncrements = new Map<string, number>();
+      const shouldPropagateThroughOutputs =
+        tokenRoutingMode.current === 'inferOnly' || emittingNode.type === 'outputNode';
 
-    if (tokenRoutingMode.current === 'inferOnly') {
-      const shouldWriteOutputs = emittingNode.type === 'inferenceNode';
-      if (shouldWriteOutputs) {
+      const nodePathCount = new Map<string, number>();
+      const edgePathCount = new Map<string, number>();
+      const pending = new Map<string, number>([[nodeId, 1]]);
+
+      let guard = 0;
+      while (pending.size > 0 && guard < 10000) {
+        guard += 1;
+        const [current, delta] = pending.entries().next().value as [string, number];
+        pending.delete(current);
+        if (delta <= 0) continue;
+
+        const currentNode = nodeById.get(current);
+        if (!currentNode) continue;
+        nodePathCount.set(current, (nodePathCount.get(current) ?? 0) + delta);
+
+        const nextNodes = adjacency.get(current) ?? [];
+        for (const next of nextNodes) {
+          const edgeKey = `${current}->${next}`;
+          edgePathCount.set(edgeKey, (edgePathCount.get(edgeKey) ?? 0) + delta);
+
+          const nextNode = nodeById.get(next);
+          if (!nextNode) continue;
+          if (nextNode.type === 'outputNode' && !shouldPropagateThroughOutputs) continue;
+
+          pending.set(next, (pending.get(next) ?? 0) + delta);
+        }
+      }
+
+      const outputIncrements = new Map<string, number>();
+      if (tokenRoutingMode.current === 'inferOnly') {
+        if (emittingNode.type === 'inferenceNode') {
+          for (const [id, count] of nodePathCount.entries()) {
+            const node = nodeById.get(id);
+            if (node?.type === 'outputNode' && count > 0) {
+              outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
+            }
+          }
+        }
+      } else {
+        if (emittingNode.type === 'outputNode') {
+          outputIncrements.set(nodeId, (outputIncrements.get(nodeId) ?? 0) + 1);
+        }
         for (const [id, count] of nodePathCount.entries()) {
+          if (id === nodeId) continue;
           const node = nodeById.get(id);
           if (node?.type === 'outputNode' && count > 0) {
             outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
           }
         }
       }
-    } else {
-      if (emittingNode.type === 'outputNode') {
-        outputIncrements.set(nodeId, (outputIncrements.get(nodeId) ?? 0) + 1);
-      }
-      for (const [id, count] of nodePathCount.entries()) {
-        if (id === nodeId) continue;
-        const node = nodeById.get(id);
-        if (node?.type === 'outputNode' && count > 0) {
-          outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
-        }
-      }
-    }
 
-
-    const formatUpdates = new Map<string, Record<string, string>>();
-    for (const edge of edges) {
-      if (edge.source !== nodeId) continue;
-      const targetNode = nodeById.get(edge.target);
-      if (!targetNode || targetNode.type !== 'formatNode') continue;
-      const targetData = targetNode.data as FormatNodeData;
-      const currentRuntime = { ...(targetData.runtimeParts ?? {}) };
-      currentRuntime[nodeId] = `${currentRuntime[nodeId] ?? ''}${char}`;
-      formatUpdates.set(edge.target, currentRuntime);
-    }
-
-    // 将 Ref 的突变操作提取到 setState 外部，避免 React 严格模式重复执行导致 token 翻倍
-    for (const node of nodes) {
-      const increment = outputIncrements.get(node.id) ?? 0;
-      if (node.type === 'outputNode' && (increment > 0 || switchedToOutputMode)) {
-        const baseText = switchedToOutputMode ? '' : (outputBuffers.current[node.id] ?? '');
+      for (const [targetId, increment] of outputIncrements.entries()) {
+        if (increment <= 0 && !switchedToOutputMode) continue;
+        const baseText = switchedToOutputMode ? '' : (outputBuffers.current[targetId] ?? '');
         const nextText = increment > 0 ? `${baseText}${char.repeat(increment)}` : baseText;
-        outputBuffers.current[node.id] = nextText;
+        outputBuffers.current[targetId] = nextText;
+        touchedOutputs.add(targetId);
+      }
+
+      for (const targetId of adjacency.get(nodeId) ?? []) {
+        const targetNode = nodeById.get(targetId);
+        if (!targetNode || targetNode.type !== 'formatNode') continue;
+        const runtimeParts = formatRuntimeRef.current[targetId] ?? {};
+        runtimeParts[nodeId] = `${runtimeParts[nodeId] ?? ''}${char}`;
+        formatRuntimeRef.current[targetId] = runtimeParts;
+        touchedFormats.add(targetId);
+      }
+
+      for (const [edgeKey, increment] of edgePathCount.entries()) {
+        if (increment <= 0) continue;
+        const edgeId = edgeIdByKey.get(edgeKey);
+        if (!edgeId) continue;
+        const arr = edgeTokenAppends.get(edgeId) ?? [];
+        for (let i = 0; i < increment; i += 1) arr.push(char);
+        edgeTokenAppends.set(edgeId, arr);
       }
     }
 
-    setNodes((nds) =>
-      nds.map((node) => {
-        const increment = outputIncrements.get(node.id) ?? 0;
-        if (node.type === 'outputNode' && (increment > 0 || switchedToOutputMode)) {
+    if (touchedOutputs.size > 0 || touchedFormats.size > 0) {
+      setNodes((nds) => nds.map((node) => {
+        if (node.type === 'outputNode' && touchedOutputs.has(node.id)) {
           const data = node.data as OutputNodeData & { onClear?: (id: string) => void };
-
-          return {
-            ...node,
-            data: { ...data, text: outputBuffers.current[node.id] }
-          };
+          return { ...node, data: { ...data, text: outputBuffers.current[node.id] ?? '' } };
         }
-        if (node.type === 'formatNode' && formatUpdates.has(node.id)) {
+        if (node.type === 'formatNode' && touchedFormats.has(node.id)) {
           const data = node.data as FormatNodeData;
-          return {
-            ...node,
-            data: { ...data, runtimeParts: formatUpdates.get(node.id) }
-          };
+          return { ...node, data: { ...data, runtimeParts: formatRuntimeRef.current[node.id] ?? {} } };
         }
         return node;
-      })
-    );
+      }));
+    }
 
-    setEdges((eds) =>
-      eds.map((edge) => {
-        const edgeKey = `${edge.source}->${edge.target}`;
-        const increment = edgePathCount.get(edgeKey) ?? 0;
-        if (increment > 0) {
-          const tokens = edge.data?.tokens ?? [];
-          return { ...edge, data: { tokens: [...tokens, ...Array.from({ length: increment }, () => char)] } };
-        }
-        return edge;
-      })
-    );
-  };
+    if (edgeTokenAppends.size > 0) {
+      setEdges((eds) => eds.map((edge) => {
+        const appended = edgeTokenAppends.get(edge.id);
+        if (!appended || appended.length === 0) return edge;
+        const prev = edge.data?.tokens ?? [];
+        const nextTokens = [...prev, ...appended].slice(-MAX_EDGE_TOKENS);
+        return { ...edge, data: { tokens: nextTokens } };
+      }));
+    }
+  }, [setEdges, setNodes]);
+
+  const handleIncomingToken = useCallback((nodeId: string, char: string) => {
+    tokenQueueRef.current.push({ nodeId, char });
+    if (flushRafRef.current == null) {
+      flushRafRef.current = window.requestAnimationFrame(() => {
+        flushTokenQueue();
+      });
+    }
+  }, [flushTokenQueue]);
+
+
 
   const isValidConnection = (connection: Connection | AppEdge) => {
     if (isRunning) return false;
@@ -575,6 +589,23 @@ function AppCanvas() {
     onEdgesChange(changes);
   };
 
+  useEffect(() => {
+    nodeByIdRef.current = new Map(nodes.map((node) => [node.id, node]));
+
+    const adjacencySet = new Map<string, Set<string>>();
+    const edgeIdByKey = new Map<string, string>();
+    for (const edge of edges) {
+      if (!adjacencySet.has(edge.source)) adjacencySet.set(edge.source, new Set());
+      adjacencySet.get(edge.source)?.add(edge.target);
+      edgeIdByKey.set(`${edge.source}->${edge.target}`, edge.id);
+    }
+
+    adjacencyRef.current = new Map(
+      Array.from(adjacencySet.entries()).map(([source, targets]) => [source, Array.from(targets)])
+    );
+    edgeIdByKeyRef.current = edgeIdByKey;
+  }, [edges, nodes]);
+
   const normalizeGraphNode = (node: Partial<AppNode> & { type?: string; id?: string }): AppNode | null => {
     if (!node?.id || !node?.type || !['formatNode', 'inferenceNode', 'outputNode'].includes(node.type)) {
       return null;
@@ -669,6 +700,13 @@ function AppCanvas() {
     }
   }, [graphConfig?.autoLoadFrontend, loadGraphConfig]);
 
+  useEffect(() => () => {
+    if (flushRafRef.current != null) {
+      window.cancelAnimationFrame(flushRafRef.current);
+      flushRafRef.current = null;
+    }
+  }, []);
+
   const runPipeline = async () => {
     if (isRunning) return;
     setIsRunning(true);
@@ -676,6 +714,16 @@ function AppCanvas() {
 
     outputBuffers.current = {};
     tokenRoutingMode.current = 'unknown';
+    tokenQueueRef.current = [];
+    if (flushRafRef.current != null) {
+      window.cancelAnimationFrame(flushRafRef.current);
+      flushRafRef.current = null;
+    }
+    formatRuntimeRef.current = Object.fromEntries(
+      nodes
+        .filter((node) => node.type === 'formatNode')
+        .map((node) => [node.id, {} as Record<string, string>])
+    );
     setNodes((nds) => nds.map((n) => {
       if (n.type === 'outputNode') return { ...n, data: { ...(n.data as OutputNodeData), text: '' } };
       if (n.type === 'formatNode') return { ...n, data: { ...(n.data as FormatNodeData), runtimeParts: {} } };
@@ -738,6 +786,7 @@ function AppCanvas() {
         console.error('Run pipeline failed:', err);
       }
     } finally {
+      flushTokenQueue();
       setIsRunning(false);
       setEdges((eds) => eds.map((e) => ({ ...e, animated: false, style: { ...(e.style ?? {}), strokeDasharray: '5,5' } })));
     }
