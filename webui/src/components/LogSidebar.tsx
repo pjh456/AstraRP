@@ -68,7 +68,7 @@ export default function LogSidebar({ className = '' }: { className?: string }) {
     const filteredLogs = logs.filter(log => activeLevels.has(log.level));
 
     return (
-        <aside className={`w-80 h-full bg-gray-900 border-l border-gray-800 flex flex-col z-10 ${className}`}>
+        <aside className={`w-full h-full bg-gray-900 border-l border-gray-800 flex flex-col z-10 ${className}`}>
             {/* Header */}
             <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900">
                 <div className="flex items-center gap-2">

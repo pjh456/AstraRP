@@ -5,8 +5,6 @@ import {
   Controls,
   Background,
   ConnectionMode,
-  useNodesState,
-  useEdgesState,
   addEdge,
   useReactFlow,
   ReactFlowProvider,
@@ -20,7 +18,11 @@ import type {
   NodeChange,
   EdgeChange
 } from '@xyflow/react';
+import { Group, Panel, Separator, } from 'react-resizable-panels';
+import type { PanelImperativeHandle } from 'react-resizable-panels';
 import '@xyflow/react/dist/style.css';
+import { GripVertical } from 'lucide-react';
+import { useFlowStore } from './store/useFlowStore';
 
 import InferenceNode from './nodes/InferenceNode';
 import FormatNode from './nodes/FormatNode';
@@ -54,7 +56,7 @@ type OutputNodeData = {
   text: string;
 };
 
-type AppNode =
+export type AppNode =
   | Node<FormatNodeData>
   | Node<InferenceNodeData>
   | Node<OutputNodeData>;
@@ -63,7 +65,7 @@ type TokenEdgeData = {
   tokens: string[];
 };
 
-type AppEdge = Edge<TokenEdgeData>;
+export type AppEdge = Edge<TokenEdgeData>;
 
 type NodeKind = 'formatNode' | 'inferenceNode' | 'outputNode';
 
@@ -108,62 +110,6 @@ const defaultNodeData: Record<NodeKind, FormatNodeData | InferenceNodeData | Out
   outputNode: { text: '' }
 };
 
-const initNodes: AppNode[] = [
-  {
-    id: 'format_1',
-    type: 'formatNode',
-    position: { x: 50, y: 150 },
-    data: { formatStr: 'User: Hello\nAssistant:' }
-  },
-  {
-    id: 'infer_1',
-    type: 'inferenceNode',
-    position: { x: 350, y: 130 },
-    data: {
-      model: 'qwen2.5-0.5b',
-      addSpecial: true,
-      parseSpecial: true,
-      maxTokens: 150,
-      temperature: 0.7,
-      topK: 40,
-      topP: 0.9,
-      topPMinKeep: 1,
-      seed: -1,
-      grammar: '',
-      loraName: '',
-      loraPath: '',
-      loraScale: 1
-    }
-  },
-  {
-    id: 'out_1',
-    type: 'outputNode',
-    position: { x: 700, y: 130 },
-    data: { text: '' }
-  }
-];
-
-const initEdges: AppEdge[] = [
-  {
-    id: 'e1-2',
-    source: 'format_1',
-    target: 'infer_1',
-    type: 'tokenEdge',
-    style: { stroke: '#a855f7', strokeWidth: 2, strokeDasharray: '5,5' },
-    animated: false,
-    data: { tokens: [] }
-  },
-  {
-    id: 'e2-3',
-    source: 'infer_1',
-    target: 'out_1',
-    type: 'tokenEdge',
-    style: { stroke: '#22c55e', strokeWidth: 2, strokeDasharray: '5,5' },
-    animated: false,
-    data: { tokens: [] }
-  }
-];
-
 const makeNodeId = (kind: NodeKind, taken: Set<string>, suffix = '') => {
   const base = `${nodePrefix[kind]}_`;
   let i = 1;
@@ -187,11 +133,17 @@ const makeEdgeId = (source: string, target: string, taken: Set<string>) => {
 };
 
 function AppCanvas() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initEdges);
+  // const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initNodes);
+  // const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initEdges);
+  // const [isRunning, setIsRunning] = useState(false);
+  const {
+    nodes, edges, setNodes, setEdges,
+    onNodesChange, onEdgesChange,
+    isRunning, setIsRunning
+  } = useFlowStore();
+
   const [selectedNodes, setSelectedNodes] = useState<AppNode[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<AppEdge[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
@@ -200,8 +152,6 @@ function AppCanvas() {
   const tokenRoutingMode = useRef<'unknown' | 'inferOnly' | 'outputEmits'>('unknown');
   const [graphConfig, setGraphConfig] = useState<GraphConnectionConfig | null>(null);
   const [graphStatus, setGraphStatus] = useState('未读取图连接配置');
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
 
   const tokenQueueRef = useRef<TokenEvent[]>([]);
   const flushRafRef = useRef<number | null>(null);
@@ -814,12 +764,40 @@ function AppCanvas() {
     }
   };
 
+  // 引入面板的 Ref 控制折叠
+  const leftPanelRef = useRef<PanelImperativeHandle>(null);
+  const rightPanelRef = useRef<PanelImperativeHandle>(null);
+
+  const toggleLeftPanel = () => {
+    const panel = leftPanelRef.current;
+    if (panel) panel.isCollapsed() ? panel.expand() : panel.collapse();
+  };
+
+  const toggleRightPanel = () => {
+    const panel = rightPanelRef.current;
+    if (panel) panel.isCollapsed() ? panel.expand() : panel.collapse();
+  };
+
   return (
-    <div className="relative bg-gray-900 overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
+    <div className="flex h-screen w-screen bg-gray-900 overflow-hidden text-gray-200">
+      {/* 优雅的全局提示组件 */}
       <Toaster theme="dark" position="top-center" richColors />
-      <div className="relative bg-gray-900 overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
-        <div className={`absolute left-0 top-0 z-20 h-full transition-transform duration-300 ${isLeftSidebarCollapsed ? '-translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
+
+      {/* 面板组：方向水平，撑满全屏 */}
+      <Group orientation="horizontal" className="w-full h-full">
+
+        {/* ============ 左侧属性面板 ============ */}
+        <Panel
+          panelRef={leftPanelRef}
+          defaultSize={350}
+          minSize={250}
+          maxSize={500}
+          collapsible={true}
+          collapsedSize={0}
+          className="z-10"
+        >
           <Sidebar
+            className="!w-full !border-none" // 覆盖原本固定的 w-80
             allEdges={edges}
             selectedNode={selectedNode}
             selectedEdge={selectedEdge}
@@ -841,93 +819,122 @@ function AppCanvas() {
             onLoadGraphConfig={loadGraphConfig}
             onSaveGraphConfig={saveGraphConfig}
           />
-          <button
-            type="button"
-            onClick={() => setIsLeftSidebarCollapsed((prev) => !prev)}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full w-8 h-20 rounded-r-xl bg-gray-800 border border-gray-700 border-l-0 text-gray-200 hover:bg-gray-700"
-            title={isLeftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'}
-          >
-            {isLeftSidebarCollapsed ? '>' : '<'}
-          </button>
-        </div>
+        </Panel>
 
-        <div ref={paneRef} className="h-full relative" onClick={() => setContextMenu(null)}>
-          <ReactFlow
-            nodes={renderNodes}
-            edges={edges}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={onConnect}
-            isValidConnection={isValidConnection}
-            nodesConnectable={!isRunning}
-            connectionMode={ConnectionMode.Strict}
-            deleteKeyCode={isRunning ? null : ['Delete', 'Backspace']}
-            multiSelectionKeyCode="Shift"
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            onSelectionChange={handleSelectionChange}
-            onlyRenderVisibleElements
-            onPaneContextMenu={(event) => {
-              event.preventDefault();
-              if (isRunning || !paneRef.current) return;
-              const rect = paneRef.current.getBoundingClientRect();
-              const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-              setContextMenu({
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top,
-                flowX: flowPosition.x,
-                flowY: flowPosition.y
-              });
-            }}
-            fitView
-            proOptions={{ hideAttribution: true }}
-            snapToGrid={true}
-            snapGrid={[15, 15]}
-          >
-            <Background color="#4b5563" gap={15} size={1} />
-            <Controls className="bg-gray-800 border-gray-700 fill-gray-300" />
-            <MiniMap
-              className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden"
-              maskColor="rgba(17, 24, 39, 0.7)"
-              nodeColor={(node) => {
-                if (node.type === 'inferenceNode') return '#a855f7';
-                if (node.type === 'formatNode') return '#3b82f6';
-                if (node.type === 'outputNode') return '#22c55e';
-                return '#6b7280';
-              }}
-            />
-          </ReactFlow>
+        {/* 左侧面板拖拽分隔线 */}
+        <Separator className="relative flex w-2 items-center justify-center bg-gray-900 hover:bg-gray-800 transition-colors cursor-col-resize z-30 group">
+          <GripVertical className="w-3 h-5 text-gray-700 group-hover:text-purple-400 transition-colors" />
+        </Separator>
 
-          {!isRunning && (
-            <div className="absolute bottom-4 left-4 text-xs text-gray-400 bg-gray-900/80 border border-gray-700 rounded px-3 py-2">
-              左键从节点右侧小圆点拖到目标左侧小圆点连边；按 Shift 可多选，按 Delete 可删节点/边。
-            </div>
-          )}
+        {/* ============ 中间画布区域 ============ */}
+        <Panel className="relative min-w-[300px]">
+          <div ref={paneRef} className="h-full w-full relative" onClick={() => setContextMenu(null)}>
 
-          {contextMenu && (
-            <div
-              className="absolute z-10 bg-gray-800 border border-gray-700 rounded-md shadow-xl min-w-[180px]"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
+            {/* 左上角悬浮按钮：控制左侧边栏 */}
+            <button
+              onClick={toggleLeftPanel}
+              className="absolute left-4 top-4 z-40 p-2 bg-gray-800 border border-gray-700 rounded-md shadow-lg hover:bg-gray-700 hover:text-white transition-all text-gray-400 flex items-center justify-center"
+              title="切换属性栏"
             >
-              <button onClick={() => addNodeByContextMenu('formatNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Format 节点</button>
-              <button onClick={() => addNodeByContextMenu('inferenceNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Inference 节点</button>
-              <button onClick={() => addNodeByContextMenu('outputNode')} className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-700">添加 Output 节点</button>
-            </div>
-          )}
-        </div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
 
-        <div className={`absolute right-0 top-0 z-20 h-full transition-transform duration-300 ${isRightSidebarCollapsed ? 'translate-x-[calc(100%-2rem)]' : 'translate-x-0'}`}>
-          <button
-            type="button"
-            onClick={() => setIsRightSidebarCollapsed((prev) => !prev)}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full w-8 h-20 rounded-l-xl bg-gray-800 border border-gray-700 border-r-0 text-gray-200 hover:bg-gray-700"
-            title={isRightSidebarCollapsed ? '展开日志栏' : '收起日志栏'}
-          >
-            {isRightSidebarCollapsed ? '<' : '>'}
-          </button>
-          <LogSidebar />
-        </div>
-      </div>
+            <ReactFlow
+              nodes={renderNodes}
+              edges={edges}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onConnect={onConnect}
+              isValidConnection={isValidConnection}
+              nodesConnectable={!isRunning}
+              connectionMode={ConnectionMode.Strict}
+              deleteKeyCode={isRunning ? null : ['Delete', 'Backspace']}
+              multiSelectionKeyCode="Shift"
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              onSelectionChange={handleSelectionChange}
+              onlyRenderVisibleElements
+              onPaneContextMenu={(event) => {
+                event.preventDefault();
+                if (isRunning || !paneRef.current) return;
+                const rect = paneRef.current.getBoundingClientRect();
+                const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+                setContextMenu({
+                  x: event.clientX - rect.left,
+                  y: event.clientY - rect.top,
+                  flowX: flowPosition.x,
+                  flowY: flowPosition.y
+                });
+              }}
+              fitView
+              proOptions={{ hideAttribution: true }}
+              snapToGrid={true}
+              snapGrid={[15, 15]}
+            >
+              <Background color="#4b5563" gap={15} size={1} />
+              <Controls className="bg-gray-800 border-gray-700 fill-gray-300" />
+              <MiniMap
+                className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden"
+                maskColor="rgba(17, 24, 39, 0.7)"
+                nodeColor={(node) => {
+                  if (node.type === 'inferenceNode') return '#a855f7';
+                  if (node.type === 'formatNode') return '#3b82f6';
+                  if (node.type === 'outputNode') return '#22c55e';
+                  return '#6b7280';
+                }}
+              />
+            </ReactFlow>
+
+            {/* 右上角悬浮按钮：控制日志栏 */}
+            <button
+              onClick={toggleRightPanel}
+              className="absolute right-4 top-4 z-40 p-2 bg-gray-800 border border-gray-700 rounded-md shadow-lg hover:bg-gray-700 hover:text-white transition-all text-gray-400 flex items-center justify-center"
+              title="切换日志栏"
+            >
+              {/* 这里用内联 SVG 替代 Terminal 图标以防导入失败，你也可以用 <Terminal size={18} /> */}
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            </button>
+
+            {/* 底部帮助提示（非运行状态下显示） */}
+            {!isRunning && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-gray-400 bg-gray-900/80 border border-gray-700 rounded-full px-4 py-2 pointer-events-none z-10 backdrop-blur-sm shadow-xl">
+                左键连线 | Shift 多选 | Delete 删除节点/连线
+              </div>
+            )}
+
+            {/* 自定义右键菜单 */}
+            {contextMenu && (
+              <div
+                className="absolute z-50 bg-gray-800/95 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl min-w-[180px] overflow-hidden"
+                style={{ left: contextMenu.x, top: contextMenu.y }}
+              >
+                <button onClick={() => addNodeByContextMenu('formatNode')} className="w-full text-left px-4 py-2.5 text-sm text-gray-200 hover:bg-purple-600/30 transition-colors">添加 Format 节点</button>
+                <button onClick={() => addNodeByContextMenu('inferenceNode')} className="w-full text-left px-4 py-2.5 text-sm text-gray-200 hover:bg-purple-600/30 transition-colors">添加 Inference 节点</button>
+                <button onClick={() => addNodeByContextMenu('outputNode')} className="w-full text-left px-4 py-2.5 text-sm text-gray-200 hover:bg-purple-600/30 transition-colors">添加 Output 节点</button>
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        {/* 右侧面板拖拽分隔线 */}
+        <Separator className="relative flex w-2 items-center justify-center bg-gray-900 hover:bg-gray-800 transition-colors cursor-col-resize z-30 group">
+          <GripVertical className="w-3 h-5 text-gray-700 group-hover:text-purple-400 transition-colors" />
+        </Separator>
+
+        {/* ============ 右侧日志面板 ============ */}
+        <Panel
+          panelRef={rightPanelRef}
+          defaultSize={350}
+          minSize={250}
+          maxSize={500}
+          collapsible={true}
+          collapsedSize={0}
+          className="z-10 bg-gray-900"
+        >
+          <LogSidebar className="!w-full !border-none" /> {/* 同样覆盖 w-80 */}
+        </Panel>
+
+      </Group>
     </div>
   );
 }

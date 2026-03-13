@@ -392,7 +392,7 @@ export default function Sidebar(props: SidebarProps) {
   } = props;
 
   return (
-    <aside className={`w-80 h-full bg-gray-900 border-r border-gray-800 flex flex-col ${className}`}>
+    <aside className={`w-full h-full bg-gray-900 border-r border-gray-800 flex flex-col ${className}`}>
       <div className="p-4 border-b border-gray-800">
         <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">Astra RP Studio</h1>
         <p className="text-xs text-gray-500 mt-1">LLM Pipeline Editor</p>
