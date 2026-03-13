@@ -65,8 +65,14 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
 
   const handleTextOrNumberChange = (key: string, value: string) => {
     const originalValue = editableNodeData[key];
-    const parsedValue = typeof originalValue === 'number' ? Number(value) : value;
-    setDraftData((prev) => ({ ...prev, [key]: parsedValue }));
+    if (typeof originalValue === 'number') {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return;
+      setDraftData((prev) => ({ ...prev, [key]: parsed }));
+      return;
+    }
+
+    setDraftData((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleBooleanChange = (key: string, value: boolean) => {

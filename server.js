@@ -9,6 +9,22 @@ const astra = require('./build/Release/astrarp_node.node');
 
 const app = express();
 
+
+const sanitizeInferenceConfig = (raw) => {
+    const data = raw && typeof raw === 'object' ? raw : {};
+    return {
+        addSpecial: typeof data.addSpecial === 'boolean' ? data.addSpecial : undefined,
+        parseSpecial: typeof data.parseSpecial === 'boolean' ? data.parseSpecial : undefined,
+        maxTokens: Number.isFinite(data.maxTokens) ? data.maxTokens : undefined,
+        temperature: Number.isFinite(data.temperature) ? data.temperature : undefined,
+        topK: Number.isFinite(data.topK) ? data.topK : undefined,
+        topP: Number.isFinite(data.topP) ? data.topP : undefined,
+        topPMinKeep: Number.isFinite(data.topPMinKeep) ? data.topPMinKeep : undefined,
+        seed: Number.isFinite(data.seed) ? data.seed : undefined,
+        grammar: typeof data.grammar === 'string' ? data.grammar : undefined
+    };
+};
+
 app.use(cors());
 app.use(express.json());
 
@@ -90,7 +106,7 @@ app.post('/api/run', (req, res) => {
                 const prompt = node?.data?.formatStr || 'User: Hello\nAssistant:';
                 pipeline.addFormatNode(node.id, String(prompt));
             } else if (node.type === 'inferenceNode') {
-                pipeline.addInferenceNode(node.id, node?.data || {});
+                pipeline.addInferenceNode(node.id, sanitizeInferenceConfig(node?.data));
                 inferenceNodeIds.add(node.id);
             } else if (node.type === 'outputNode') {
                 pipeline.addOutputNode(node.id);

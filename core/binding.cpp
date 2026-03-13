@@ -2,6 +2,7 @@
 #include <thread>
 #include <memory>
 #include <vector>
+#include <cmath>
 
 #include "core/global_config.hpp"
 #include "core/tokenizer.hpp"
@@ -318,6 +319,12 @@ public:
     Napi::Value AddFormatNode(const Napi::CallbackInfo &info)
     {
         Napi::Env env = info.Env();
+        if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString())
+        {
+            Napi::TypeError::New(env, "addFormatNode expects (id: string, formatSpec: string)").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+
         std::string id = info[0].As<Napi::String>().Utf8Value();
         std::string format_spec = info[1].As<Napi::String>().Utf8Value();
 
@@ -339,6 +346,12 @@ public:
     Napi::Value AddInferenceNode(const Napi::CallbackInfo &info)
     {
         Napi::Env env = info.Env();
+        if (info.Length() < 1 || !info[0].IsString())
+        {
+            Napi::TypeError::New(env, "addInferenceNode expects (id: string, config?: object)").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+
         std::string id = info[0].As<Napi::String>().Utf8Value();
 
         // 使用你框架中的默认构造
@@ -359,28 +372,62 @@ public:
                 return v.IsBoolean() ? v.As<Napi::Boolean>().Value() : fallback;
             };
 
-            auto read_i32 = [&cfg](const char *key, int32_t fallback) -> int32_t
+            auto read_i32 = [&cfg](const char *key, int32_t fallback, int32_t min_value, int32_t max_value) -> int32_t
             {
                 if (!cfg.Has(key))
                     return fallback;
                 auto v = cfg.Get(key);
-                return v.IsNumber() ? static_cast<int32_t>(v.As<Napi::Number>().Int32Value()) : fallback;
+                if (!v.IsNumber())
+                    return fallback;
+
+                const double raw = v.As<Napi::Number>().DoubleValue();
+                if (!std::isfinite(raw))
+                    return fallback;
+
+                int64_t parsed = static_cast<int64_t>(raw);
+                if (parsed < static_cast<int64_t>(min_value))
+                    parsed = min_value;
+                if (parsed > static_cast<int64_t>(max_value))
+                    parsed = max_value;
+                return static_cast<int32_t>(parsed);
             };
 
-            auto read_u64 = [&cfg](const char *key, size_t fallback) -> size_t
+            auto read_size = [&cfg](const char *key, size_t fallback, size_t max_value) -> size_t
             {
                 if (!cfg.Has(key))
                     return fallback;
                 auto v = cfg.Get(key);
-                return v.IsNumber() ? static_cast<size_t>(v.As<Napi::Number>().Int64Value()) : fallback;
+                if (!v.IsNumber())
+                    return fallback;
+
+                const double raw = v.As<Napi::Number>().DoubleValue();
+                if (!std::isfinite(raw) || raw < 0)
+                    return fallback;
+
+                size_t parsed = static_cast<size_t>(raw);
+                if (parsed > max_value)
+                    parsed = max_value;
+                return parsed;
             };
 
-            auto read_f32 = [&cfg](const char *key, float fallback) -> float
+            auto read_f32 = [&cfg](const char *key, float fallback, float min_value, float max_value) -> float
             {
                 if (!cfg.Has(key))
                     return fallback;
                 auto v = cfg.Get(key);
-                return v.IsNumber() ? static_cast<float>(v.As<Napi::Number>().DoubleValue()) : fallback;
+                if (!v.IsNumber())
+                    return fallback;
+
+                const double raw = v.As<Napi::Number>().DoubleValue();
+                if (!std::isfinite(raw))
+                    return fallback;
+
+                float parsed = static_cast<float>(raw);
+                if (parsed < min_value)
+                    parsed = min_value;
+                if (parsed > max_value)
+                    parsed = max_value;
+                return parsed;
             };
 
             auto read_str = [&cfg](const char *key, const Str &fallback) -> Str
@@ -394,14 +441,19 @@ public:
             tp.add_special = read_bool("addSpecial", tp.add_special);
             tp.parse_special = read_bool("parseSpecial", tp.parse_special);
 
-            dp.max_tokens = read_i32("maxTokens", dp.max_tokens);
+            dp.max_tokens = read_i32("maxTokens", dp.max_tokens, -1, 1000000);
 
-            sp.temperature = read_f32("temperature", sp.temperature);
-            sp.top_k = read_i32("topK", sp.top_k);
-            sp.top_p.first = read_f32("topP", sp.top_p.first);
-            sp.top_p.second = read_u64("topPMinKeep", sp.top_p.second);
-            sp.seed = read_i32("seed", sp.seed);
+            sp.temperature = read_f32("temperature", sp.temperature, -1.0f, 10.0f);
+            sp.top_k = read_i32("topK", sp.top_k, -1, 1000000);
+            sp.top_p.first = read_f32("topP", sp.top_p.first, -1.0f, 1.0f);
+            sp.top_p.second = read_size("topPMinKeep", sp.top_p.second, 1000000);
+            sp.seed = read_i32("seed", sp.seed, -1, 2147483647);
             sp.grammar = read_str("grammar", sp.grammar);
+
+            if (sp.top_p.first < 0.0f)
+            {
+                sp.top_p.second = 0;
+            }
         }
 
         auto nodeRes = pipeline::InferenceNode::default_create(id, tp, dp, sp, m_bus);
