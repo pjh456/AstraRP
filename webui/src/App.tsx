@@ -34,8 +34,15 @@ type FormatNodeData = {
 
 type InferenceNodeData = {
   model: string;
+  addSpecial: boolean;
+  parseSpecial: boolean;
   maxTokens: number;
   temperature: number;
+  topK: number;
+  topP: number;
+  topPMinKeep: number;
+  seed: number;
+  grammar: string;
 };
 
 type OutputNodeData = {
@@ -63,7 +70,18 @@ const nodePrefix: Record<NodeKind, string> = {
 
 const defaultNodeData: Record<NodeKind, FormatNodeData | InferenceNodeData | OutputNodeData> = {
   formatNode: { formatStr: 'User: Hello\\nAssistant:' },
-  inferenceNode: { model: 'qwen2.5-0.5b', maxTokens: 150, temperature: 0.7 },
+  inferenceNode: {
+    model: 'qwen2.5-0.5b',
+    addSpecial: true,
+    parseSpecial: true,
+    maxTokens: 150,
+    temperature: 0.7,
+    topK: 40,
+    topP: 0.9,
+    topPMinKeep: 1,
+    seed: -1,
+    grammar: ''
+  },
   outputNode: { text: '' }
 };
 
@@ -78,7 +96,18 @@ const initNodes: AppNode[] = [
     id: 'infer_1',
     type: 'inferenceNode',
     position: { x: 350, y: 130 },
-    data: { model: 'qwen2.5-0.5b', maxTokens: 150, temperature: 0.7 }
+    data: {
+      model: 'qwen2.5-0.5b',
+      addSpecial: true,
+      parseSpecial: true,
+      maxTokens: 150,
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.9,
+      topPMinKeep: 1,
+      seed: -1,
+      grammar: ''
+    }
   },
   {
     id: 'out_1',
@@ -384,7 +413,7 @@ function AppCanvas() {
   const deleteEdge = (edgeId: string) => deleteNodesAndEdges([], [edgeId]);
   const deleteSelection = () => deleteNodesAndEdges(selectedNodes.map((n) => n.id), selectedEdges.map((e) => e.id));
 
-  const saveNode = (nodeId: string, nextData: Record<string, string | number>) => {
+  const saveNode = (nodeId: string, nextData: Record<string, string | number | boolean>) => {
     if (isRunning) return;
 
     const currentNode = nodes.find((node) => node.id === nodeId);

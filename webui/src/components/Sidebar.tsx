@@ -1,6 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 import { useState } from 'react';
 
+type EditableValue = string | number | boolean;
+
 interface SidebarProps {
   selectedNode: Node | null;
   selectedEdge: Edge | null;
@@ -11,7 +13,7 @@ interface SidebarProps {
   onDeleteNode: (nodeId: string) => void;
   onDeleteEdge: (edgeId: string) => void;
   onDeleteSelection: () => void;
-  onSaveNode: (nodeId: string, nextData: Record<string, string | number>) => void;
+  onSaveNode: (nodeId: string, nextData: Record<string, EditableValue>) => void;
   onSaveEdge: (edgeId: string, stroke: string) => void;
   onCopyNode: (nodeId: string) => void;
   onCopySelection: () => void;
@@ -20,12 +22,12 @@ interface SidebarProps {
   isRunning: boolean;
 }
 
-const toEditableNodeData = (data: Record<string, unknown> | undefined): Record<string, string | number> => {
+const toEditableNodeData = (data: Record<string, unknown> | undefined): Record<string, EditableValue> => {
   if (!data) return {};
 
   return Object.fromEntries(
-    Object.entries(data).filter(([, value]) => typeof value === 'string' || typeof value === 'number')
-  ) as Record<string, string | number>;
+    Object.entries(data).filter(([, value]) => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+  ) as Record<string, EditableValue>;
 };
 
 function MultiSelectionEditor({ selectedNodeCount, selectedEdgeCount, onCopySelection, onDeleteSelection, isRunning }: Pick<SidebarProps, 'selectedNodeCount' | 'selectedEdgeCount' | 'onCopySelection' | 'onDeleteSelection' | 'isRunning'>) {
@@ -57,14 +59,18 @@ function MultiSelectionEditor({ selectedNodeCount, selectedEdgeCount, onCopySele
 
 function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, onCopyNode, isRunning }: Pick<SidebarProps, 'selectedNode' | 'allEdges' | 'onDeleteNode' | 'onSaveNode' | 'onCopyNode' | 'isRunning'>) {
   const editableNodeData = toEditableNodeData(selectedNode?.data as Record<string, unknown> | undefined);
-  const [draftData, setDraftData] = useState<Record<string, string | number>>(editableNodeData);
+  const [draftData, setDraftData] = useState<Record<string, EditableValue>>(editableNodeData);
 
   if (!selectedNode) return null;
 
-  const handleInputChange = (key: string, value: string) => {
+  const handleTextOrNumberChange = (key: string, value: string) => {
     const originalValue = editableNodeData[key];
     const parsedValue = typeof originalValue === 'number' ? Number(value) : value;
     setDraftData((prev) => ({ ...prev, [key]: parsedValue }));
+  };
+
+  const handleBooleanChange = (key: string, value: boolean) => {
+    setDraftData((prev) => ({ ...prev, [key]: value }));
   };
 
   const upstreamIds = allEdges.filter((edge) => edge.target === selectedNode.id).map((edge) => edge.source);
@@ -76,6 +82,48 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
   };
 
   const hasChanges = JSON.stringify(editableNodeData) !== JSON.stringify(draftData);
+
+  const renderInferenceField = (key: string, label: string) => {
+    const value = draftData[key];
+    if (typeof value === 'boolean') {
+      return (
+        <div key={key} className="flex items-center justify-between gap-2">
+          <label className="text-xs text-gray-400">{label}</label>
+          <input
+            type="checkbox"
+            disabled={isRunning}
+            checked={Boolean(value)}
+            onChange={(event) => handleBooleanChange(key, event.target.checked)}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div key={key} className="flex flex-col gap-1">
+        <label className="text-xs text-gray-400">{label}</label>
+        <input
+          disabled={isRunning}
+          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-300 focus:border-purple-500 focus:outline-none"
+          value={String(value ?? '')}
+          onChange={(event) => handleTextOrNumberChange(key, event.target.value)}
+        />
+      </div>
+    );
+  };
+
+  const inferenceFields: Array<{ key: string; label: string }> = [
+    { key: 'model', label: 'Model' },
+    { key: 'addSpecial', label: 'Add Special Tokens' },
+    { key: 'parseSpecial', label: 'Parse Special Tokens' },
+    { key: 'maxTokens', label: 'Max Tokens' },
+    { key: 'temperature', label: 'Temperature' },
+    { key: 'topK', label: 'Top K' },
+    { key: 'topP', label: 'Top P' },
+    { key: 'topPMinKeep', label: 'Top P Min Keep' },
+    { key: 'seed', label: 'Seed' },
+    { key: 'grammar', label: 'Grammar' }
+  ];
 
   return (
     <div className="space-y-4">
@@ -106,17 +154,19 @@ function NodePropertyEditor({ selectedNode, allEdges, onDeleteNode, onSaveNode, 
           </div>
         )}
 
-        {Object.entries(draftData).map(([key, value]) => (
-          <div key={key} className="flex flex-col gap-1">
-            <label className="text-xs text-gray-400 capitalize">{key}</label>
-            <input
-              disabled={isRunning}
-              className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-300 focus:border-purple-500 focus:outline-none"
-              value={String(value ?? '')}
-              onChange={(event) => handleInputChange(key, event.target.value)}
-            />
-          </div>
-        ))}
+        {selectedNode.type === 'inferenceNode'
+          ? inferenceFields.filter(({ key }) => key in draftData).map(({ key, label }) => renderInferenceField(key, label))
+          : Object.entries(draftData).map(([key, value]) => (
+            <div key={key} className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400 capitalize">{key}</label>
+              <input
+                disabled={isRunning}
+                className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-300 focus:border-purple-500 focus:outline-none"
+                value={String(value ?? '')}
+                onChange={(event) => handleTextOrNumberChange(key, event.target.value)}
+              />
+            </div>
+          ))}
 
         <div className="grid grid-cols-2 gap-2 pt-2">
           <button

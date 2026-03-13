@@ -347,6 +347,63 @@ public:
         dp.max_tokens = 100;
         infer::SampleParams sp;
 
+        if (info.Length() > 1 && info[1].IsObject())
+        {
+            Napi::Object cfg = info[1].As<Napi::Object>();
+
+            auto read_bool = [&cfg](const char *key, bool fallback) -> bool
+            {
+                if (!cfg.Has(key))
+                    return fallback;
+                auto v = cfg.Get(key);
+                return v.IsBoolean() ? v.As<Napi::Boolean>().Value() : fallback;
+            };
+
+            auto read_i32 = [&cfg](const char *key, int32_t fallback) -> int32_t
+            {
+                if (!cfg.Has(key))
+                    return fallback;
+                auto v = cfg.Get(key);
+                return v.IsNumber() ? static_cast<int32_t>(v.As<Napi::Number>().Int32Value()) : fallback;
+            };
+
+            auto read_u64 = [&cfg](const char *key, size_t fallback) -> size_t
+            {
+                if (!cfg.Has(key))
+                    return fallback;
+                auto v = cfg.Get(key);
+                return v.IsNumber() ? static_cast<size_t>(v.As<Napi::Number>().Int64Value()) : fallback;
+            };
+
+            auto read_f32 = [&cfg](const char *key, float fallback) -> float
+            {
+                if (!cfg.Has(key))
+                    return fallback;
+                auto v = cfg.Get(key);
+                return v.IsNumber() ? static_cast<float>(v.As<Napi::Number>().DoubleValue()) : fallback;
+            };
+
+            auto read_str = [&cfg](const char *key, const Str &fallback) -> Str
+            {
+                if (!cfg.Has(key))
+                    return fallback;
+                auto v = cfg.Get(key);
+                return v.IsString() ? v.As<Napi::String>().Utf8Value() : fallback;
+            };
+
+            tp.add_special = read_bool("addSpecial", tp.add_special);
+            tp.parse_special = read_bool("parseSpecial", tp.parse_special);
+
+            dp.max_tokens = read_i32("maxTokens", dp.max_tokens);
+
+            sp.temperature = read_f32("temperature", sp.temperature);
+            sp.top_k = read_i32("topK", sp.top_k);
+            sp.top_p.first = read_f32("topP", sp.top_p.first);
+            sp.top_p.second = read_u64("topPMinKeep", sp.top_p.second);
+            sp.seed = read_i32("seed", sp.seed);
+            sp.grammar = read_str("grammar", sp.grammar);
+        }
+
         auto nodeRes = pipeline::InferenceNode::default_create(id, tp, dp, sp, m_bus);
         if (nodeRes.is_err())
         {

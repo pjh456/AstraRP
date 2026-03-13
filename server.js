@@ -90,7 +90,7 @@ app.post('/api/run', (req, res) => {
                 const prompt = node?.data?.formatStr || 'User: Hello\nAssistant:';
                 pipeline.addFormatNode(node.id, String(prompt));
             } else if (node.type === 'inferenceNode') {
-                pipeline.addInferenceNode(node.id);
+                pipeline.addInferenceNode(node.id, node?.data || {});
                 inferenceNodeIds.add(node.id);
             } else if (node.type === 'outputNode') {
                 pipeline.addOutputNode(node.id);
