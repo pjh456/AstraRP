@@ -292,15 +292,10 @@ function AppCanvas() {
           }
         }
       } else {
+        // outputEmits 模式下，后端会直接上报每个 OutputNode 的 token。
+        // 这里只更新当前 emitting output，避免 Output->Output 链路被前端再次传播导致翻倍。
         if (emittingNode.type === 'outputNode') {
           outputIncrements.set(nodeId, (outputIncrements.get(nodeId) ?? 0) + 1);
-        }
-        for (const [id, count] of nodePathCount.entries()) {
-          if (id === nodeId) continue;
-          const node = nodeById.get(id);
-          if (node?.type === 'outputNode' && count > 0) {
-            outputIncrements.set(id, (outputIncrements.get(id) ?? 0) + count);
-          }
         }
       }
 
