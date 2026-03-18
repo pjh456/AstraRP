@@ -3,9 +3,9 @@ const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
-function run(cmd, cwd) {
+function run(cmd, cwd, env = process.env) {
     console.log(`\n>> ${cmd}`);
-    execSync(cmd, { stdio: "inherit", cwd: cwd });
+    execSync(cmd, { stdio: "inherit", cwd: cwd, env: env });
 }
 
 function findFiles(dir, ext, fileList = []) {
@@ -39,9 +39,7 @@ try {
     const coreDir = path.join(rootDir, "core");
     const buildPath = path.join(coreDir, "build");
 
-    const isWin = process.platform === "win32";
-    const staticLibExt = isWin ? ".lib" : ".a";
-    const sharedLibExt = isWin ? ".dll" : (process.platform === "darwin" ? ".dylib" : ".so");
+    const staticLibExts = [".a", ".lib"];
 
     // 1. 强制清理旧编译产物
     if (fs.existsSync(buildPath)) {
@@ -49,16 +47,50 @@ try {
         fs.rmSync(buildPath, { recursive: true, force: true });
     }
 
+    const cmakeEnv = Object.assign({}, process.env);
+    if (process.platform === "win32") {
+        // 清除任何强行指定的全局生成器或编译器
+        delete cmakeEnv.CMAKE_GENERATOR;
+        delete cmakeEnv.CC;
+        delete cmakeEnv.CXX;
+
+        // 动态查找 PATH 键名 (无视大小写)
+        const pathKey = Object.keys(cmakeEnv).find(k => k.toLowerCase() === "path");
+        if (pathKey && cmakeEnv[pathKey]) {
+            cmakeEnv[pathKey] = cmakeEnv[pathKey]
+                .split(path.delimiter)
+                .filter(p => {
+                    // 将路径统一转为小写且斜杠统一，防止误伤含有这些字符的用户名
+                    const normalizedPath = p.toLowerCase().replace(/\\/g, '/');
+                    return !normalizedPath.includes('/mingw') && 
+                           !normalizedPath.includes('/msys') && 
+                           !normalizedPath.includes('/cygwin') && 
+                           !normalizedPath.includes('/ninja') &&
+                           !normalizedPath.includes('ccache');
+                })
+                .join(path.delimiter);
+            console.log("[*] Cleaned PATH for CMake to force Visual Studio usage.");
+        }
+    }
+
     // 2. 编译 Core CMake
     console.log("[+] Building core with CMake...");
-    run("cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CONFIGURATION_TYPES=Release", coreDir);
-    run("cmake --build build --config Release", coreDir);
+    try {
+        run("cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CONFIGURATION_TYPES=Release", coreDir, cmakeEnv);
+        run("cmake --build build --config Release", coreDir, cmakeEnv);
+    } catch (e) {
+        if (e.message && e.message.includes("is not recognized")) {
+            console.error("\n[!] 错误: CMake 找不到！这说明你目前使用的 CMake 可能安装在 MinGW 里。");
+            console.error("[!] 解决: 请去 CMake 官网下载并安装 Windows 官方版 CMake 并加入环境变量。");
+            process.exit(1);
+        }
+        throw e;
+    }
 
     // 3. 生成 binding.gyp
     console.log("[+] Auto-configuring binding.gyp...");
-    const libs = findFiles(buildPath, staticLibExt)
-        .filter(lib => !lib.includes("benchmark") && !lib.includes("gtest") && !lib.includes("mock"))
-        .map(lib => path.relative(rootDir, lib).replace(/\\/g, '/'));
+    const libs = findFiles(buildPath, "")
+    .filter(file => staticLibExts.some(ext => file.endsWith(ext)))
 
     if (libs.length === 0) throw new Error("No static libraries found!");
 
@@ -74,7 +106,7 @@ try {
                 "./core/pjh_json/include"
             ],
             dependencies: ["<!(node -p \"require('node-addon-api').gyp\")"],
-            libraries: libs.map(lib => `<(module_root_dir)/${lib}`),
+            libraries: libs,
             cflags_cc: ["-std=c++20", "-O3", "-march=native"],
             defines: ["NAPI_CPP_EXCEPTIONS", "LLAMA_SHARED"],
             msvs_settings: {
@@ -98,12 +130,12 @@ try {
 
     // 5. 复制动态库
     const targetDir = path.join(rootDir, "build", "Release");
-    const sharedLibs = findFiles(buildPath, sharedLibExt);
-    sharedLibs.forEach(libPath => {
-        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-        fs.copyFileSync(libPath, path.join(targetDir, path.basename(libPath)));
-        console.log(`  -> Copied: ${path.basename(libPath)}`);
-    });
+    // const sharedLibs = findFiles(buildPath, ".dll"); 
+    // sharedLibs.forEach(libPath => {
+    //     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+    //     fs.copyFileSync(libPath, path.join(targetDir, path.basename(libPath)));
+    //     console.log(`  -> Copied: ${path.basename(libPath)}`);
+    // });
 
     console.log("\n✅ All Build finished successfully!");
 
