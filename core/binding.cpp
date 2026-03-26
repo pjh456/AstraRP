@@ -611,12 +611,20 @@ public:
             // 包装参数传给 JS
             auto callback =
             [](Napi::Env env, Napi::Function jsCb, std::pair<Str, Str>* data) {
-                jsCb.Call({ Napi::String::New(env, data->first), Napi::String::New(env, data->second) });
+                if (env != nullptr && jsCb != nullptr)
+                {
+                    jsCb.Call({ Napi::String::New(env, data->first), Napi::String::New(env, data->second) });
+                }
                 delete data;
             };
-            // 将数据发往 Node 主线程执行
+            // 将数据发往 Node 主线程执行（非阻塞，避免推理线程被卡住）
             auto* data = new std::pair<Str, Str>(id, text);
-            m_tsfn_token.BlockingCall(data, callback); });
+            auto status = m_tsfn_token.NonBlockingCall(data, callback);
+            if (status != napi_ok)
+            {
+                delete data;
+            }
+        });
 
         return env.Undefined();
     }
