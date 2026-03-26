@@ -23,6 +23,31 @@ namespace astra_rp
             if (m_nodes.empty())
                 return ResultV<void>::Ok();
 
+            for (const auto &[from_id, targets] : m_link_table)
+            {
+                if (m_nodes.find(from_id) == m_nodes.end())
+                {
+                    return ResultV<void>::Err(
+                        utils::ErrorBuilder()
+                            .pipeline()
+                            .graph_cycle_detected()
+                            .message("Graph validation failed. Edge source node not found: " + from_id)
+                            .build());
+                }
+                for (const auto &to_id : targets)
+                {
+                    if (m_nodes.find(to_id) == m_nodes.end())
+                    {
+                        return ResultV<void>::Err(
+                            utils::ErrorBuilder()
+                                .pipeline()
+                                .graph_cycle_detected()
+                                .message("Graph validation failed. Edge target node not found: " + to_id)
+                                .build());
+                    }
+                }
+            }
+
             HashMap<Str, int> in_degrees_copy = m_in_degrees;
 
             Queue<Str> zero_in_degree_queue;
