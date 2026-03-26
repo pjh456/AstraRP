@@ -327,10 +327,19 @@ app.post('/api/run', (req, res) => {
     }
 
     // 绑定 Token 流水线回调
+    const pendingChunks = [];
+    const flushIntervalMs = 25;
+    const flushChunks = () => {
+        if (!pendingChunks.length || res.writableEnded) return;
+        res.write(pendingChunks.join(''));
+        pendingChunks.length = 0;
+    };
+    const flushTimer = setInterval(flushChunks, flushIntervalMs);
+
     pipeline.onToken((nodeId, text) => {
-        // 每生成一个 Token，就立刻转成 JSON 字符串并加一个换行符推给前端
+        // 聚合输出，降低系统调用频率
         const chunk = JSON.stringify({ nodeId, text }) + '\n';
-        res.write(chunk);
+        pendingChunks.push(chunk);
     });
 
     let isFinished = false;
@@ -346,11 +355,13 @@ app.post('/api/run', (req, res) => {
             console.log("Client aborted response stream, stopping pipeline...");
             safelyInvokePipelineMethod(pipeline, "stop");
         }
+        clearInterval(flushTimer);
     });
 
     // 开始执行
     pipeline.run((err, result) => {
         isFinished = true;
+        flushChunks();
         if (isClientDisconnected) {
             console.log("Pipeline stopped because client disconnected.");
         } else if (err) {
