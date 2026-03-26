@@ -8,6 +8,7 @@
 #include "core/tokenizer.hpp"
 #include "core/global_config.hpp"
 #include "infer/engine.hpp"
+#include "infer/llama_backend.hpp"
 
 namespace astra_rp
 {
@@ -21,7 +22,8 @@ namespace astra_rp
             infer::TokenizeParams tp,
             infer::DecodeParams dp,
             infer::SampleParams sp,
-            MulPtr<EventBus> bus)
+            MulPtr<EventBus> bus,
+            MulPtr<infer::InferenceBackend> backend)
         {
             auto builder =
                 core::SamplerChainBuilder();
@@ -43,18 +45,23 @@ namespace astra_rp
                 sampler,
                 builder.build());
 
+            auto resolved_backend = backend;
+            if (!resolved_backend)
+                resolved_backend = std::make_shared<infer::LlamaBackend>();
+
             ASSIGN_OR_RETURN(
                 session,
-                infer::Session::create(
+                resolved_backend->create_session(
                     model, cp,
-                    std::move(sampler)));
+                    std::move(sampler),
+                    0));
 
             infer::GenerationConfig conf;
             conf.add_special = tp.add_special;
             conf.parse_special = tp.parse_special;
             conf.max_tokens = dp.max_tokens;
 
-            InferenceNode node(id, bus, session);
+            InferenceNode node(id, bus, session, resolved_backend);
             node.set_config(conf);
 
             return ResultV<InferenceNode>::Ok(node);
@@ -66,7 +73,8 @@ namespace astra_rp
             infer::TokenizeParams tp,
             infer::DecodeParams dp,
             infer::SampleParams sp,
-            MulPtr<EventBus> bus)
+            MulPtr<EventBus> bus,
+            MulPtr<infer::InferenceBackend> backend)
         {
             using InferRes =
                 ResultV<InferenceNode>;
@@ -89,7 +97,7 @@ namespace astra_rp
                 core::ModelManager::instance()
                     .load_config_model());
 
-            return create(id, model, cp, tp, dp, sp, bus);
+            return create(id, model, cp, tp, dp, sp, bus, backend);
         }
 
         ResultV<void>

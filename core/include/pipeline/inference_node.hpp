@@ -3,6 +3,7 @@
 
 #include "utils/types.hpp"
 #include "pipeline/base_node.hpp"
+#include "infer/inference_backend.hpp"
 #include "infer/session.hpp"
 #include "core/lora.hpp"
 #include "infer/tokenize_task.hpp"
@@ -27,13 +28,17 @@ namespace astra_rp
 
             // 在回调前灵活拼接 prompts
             std::function<Str(const HashMap<Str, NodePayload> &)> m_prompt_builder;
+            MulPtr<infer::InferenceBackend> m_backend;
 
         public:
             InferenceNode(
                 const Str &id,
                 MulPtr<EventBus> bus,
-                MulPtr<infer::Session> session)
-                : BaseNode(id, bus), m_session(session) {}
+                MulPtr<infer::Session> session,
+                MulPtr<infer::InferenceBackend> backend = nullptr)
+                : BaseNode(id, bus),
+                  m_session(session),
+                  m_backend(backend) {}
 
             void set_lora(
                 MulPtr<core::LoRA> lora,
@@ -50,6 +55,11 @@ namespace astra_rp
                 m_config = config;
             }
 
+            void set_backend(MulPtr<infer::InferenceBackend> backend)
+            {
+                m_backend = backend;
+            }
+
         public:
             static ResultV<InferenceNode>
             create(
@@ -59,7 +69,8 @@ namespace astra_rp
                 infer::TokenizeParams tp,
                 infer::DecodeParams dp,
                 infer::SampleParams sp,
-                MulPtr<EventBus> bus = nullptr);
+                MulPtr<EventBus> bus = nullptr,
+                MulPtr<infer::InferenceBackend> backend = nullptr);
 
             static ResultV<InferenceNode>
             default_create(
@@ -67,7 +78,8 @@ namespace astra_rp
                 infer::TokenizeParams tp,
                 infer::DecodeParams dp,
                 infer::SampleParams sp,
-                MulPtr<EventBus> bus = nullptr);
+                MulPtr<EventBus> bus = nullptr,
+                MulPtr<infer::InferenceBackend> backend = nullptr);
 
         public:
             ResultV<void> execute() override;
