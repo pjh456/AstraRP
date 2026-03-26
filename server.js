@@ -74,6 +74,21 @@ const safelyInvokePipelineMethod = (pipeline, methodName, ...args) => {
     return true;
 };
 
+const runtimeRoot = path.resolve('./runtime_loras');
+const isPathWithin = (baseDir, targetPath) => {
+    const rel = path.relative(baseDir, targetPath);
+    return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+};
+
+const normalizeLoraPath = (rawPath) => {
+    if (typeof rawPath !== 'string' || !rawPath.trim()) return undefined;
+    const resolved = path.resolve(rawPath);
+    if (!isPathWithin(runtimeRoot, resolved)) {
+        throw new Error('LoRA path is not allowed.');
+    }
+    return resolved;
+};
+
 const sanitizeInferenceConfig = (raw) => {
     const data = raw && typeof raw === 'object' ? raw : {};
     return {
@@ -87,7 +102,7 @@ const sanitizeInferenceConfig = (raw) => {
         seed: Number.isFinite(data.seed) ? data.seed : undefined,
         grammar: typeof data.grammar === 'string' ? data.grammar : undefined,
         loraName: typeof data.loraName === 'string' ? data.loraName : undefined,
-        loraPath: typeof data.loraPath === 'string' ? data.loraPath : undefined,
+        loraPath: normalizeLoraPath(data.loraPath),
         loraScale: Number.isFinite(data.loraScale) ? data.loraScale : undefined
     };
 };
@@ -95,8 +110,6 @@ const sanitizeInferenceConfig = (raw) => {
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-
-const runtimeRoot = path.resolve('./runtime_loras');
 
 const loraUpload = multer({
     storage: multer.diskStorage({
