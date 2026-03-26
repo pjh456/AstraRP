@@ -96,9 +96,35 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
 
+const runtimeRoot = path.resolve('./runtime_loras');
+
 const loraUpload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 1024 * 1024 * 1024 * 2 }
+    storage: multer.diskStorage({
+        destination: (req, _file, cb) => {
+            try {
+                const runId = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+                req.loraRunId = runId;
+                const targetDir = path.join(runtimeRoot, runId);
+                fs.mkdirSync(targetDir, { recursive: true });
+                cb(null, targetDir);
+            } catch (err) {
+                cb(err);
+            }
+        },
+        filename: (req, file, cb) => {
+            const fileName = safeName(file.originalname || 'adapter.gguf');
+            req.loraFileName = fileName;
+            cb(null, fileName);
+        }
+    }),
+    limits: { fileSize: 1024 * 1024 * 1024 * 2 },
+    fileFilter: (_req, file, cb) => {
+        const fileName = safeName(file.originalname || 'adapter.gguf');
+        if (!fileName.toLowerCase().endsWith('.gguf')) {
+            return cb(new Error('LoRA file must be .gguf'));
+        }
+        return cb(null, true);
+    }
 });
 
 const safeName = (name) => String(name || '').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -115,14 +141,8 @@ app.post('/api/lora/upload', loraUpload.single('loraFile'), async (req, res) => 
         }
 
         const loraName = safeName(req.body?.loraName || fileName.replace(/\.gguf$/i, ''));
-        const runId = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-
-        const runtimeRoot = path.resolve('./runtime_loras');
-        const targetDir = path.join(runtimeRoot, runId);
-        await fsp.mkdir(targetDir, { recursive: true });
-
+        const targetDir = req.file?.destination || path.join(runtimeRoot, String(req.loraRunId || ''));
         const targetPath = path.join(targetDir, fileName);
-        await fsp.writeFile(targetPath, req.file.buffer);
 
         return res.json({ loraName, loraPath: targetPath });
     } catch (error) {
