@@ -9,7 +9,7 @@ namespace astra_rp
     {
         class Model;
         class SamplerChain;
-        struct ContextParams;
+        class ContextParams;
     }
 
     namespace infer
