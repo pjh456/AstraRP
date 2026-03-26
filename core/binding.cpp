@@ -636,7 +636,21 @@ public:
         }
 
         // 创建 Scheduler 并通过 AsyncWorker 在后台执行
-        auto scheduler = std::make_shared<pipeline::Scheduler>(m_graph, 4, m_bus);
+        int max_concurrency = 1;
+        if (core::GlobalConfigManager::instance().loaded())
+        {
+            max_concurrency =
+                core::GlobalConfigManager::instance()
+                    .current()
+                    .max_concurrency;
+        }
+        if (max_concurrency < 1)
+            max_concurrency = 1;
+
+        auto scheduler = std::make_shared<pipeline::Scheduler>(
+            m_graph,
+            max_concurrency,
+            m_bus);
         PipelineRunWorker *worker = new PipelineRunWorker(jsCallback, scheduler);
         worker->Queue();
 
