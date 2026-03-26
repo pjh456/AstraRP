@@ -12,6 +12,7 @@ option(ASTRARP_ENABLE_LTO "Enable Link Time Optimization (LTO)" OFF)
 
 # 默认关闭 examples 测试集构建，如果只是为了给 Node.js 编译 addon 根本不需要编这些
 option(ASTRARP_BUILD_EXAMPLES "Build AstraRP examples" OFF)
+option(ASTRARP_BUILD_TESTS "Build AstraRP tests" OFF)
 
 # =================================================
 
@@ -136,6 +137,7 @@ add_custom_command(TARGET astra POST_BUILD
 
 # ================= 按需构建 Examples =================
 if(ASTRARP_BUILD_EXAMPLES)
+    include(CTest)
     enable_testing()
 
     # 查找 examples 目录下所有的 cpp 文件
@@ -167,4 +169,11 @@ if(ASTRARP_BUILD_EXAMPLES)
 
         # endif()
     endforeach()
+
+endif()
+
+if(ASTRARP_BUILD_TESTS)
+    include(CTest)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
