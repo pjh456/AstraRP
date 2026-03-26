@@ -11,6 +11,8 @@
     "build:core:clean": "node scripts/build_core.js --clean",
     "build:addon": "node scripts/build_addon.js",
     "build:addon:clean": "node scripts/build_addon.js --gyp-clean",
+    "test:build": "node scripts/build_tests.js",
+    "test:build:clean": "node scripts/build_tests.js --clean",
     "test:only": "node scripts/test_only.js",
     "test:rebuild": "node scripts/test_rebuild.js --clean"
   },

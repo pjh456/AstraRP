@@ -43,13 +43,12 @@ try {
     const ctestArgs = args["ctest-args"] || "";
     const buildArgs = args["build-args"] || "";
 
-    let buildCoreCmd = `node scripts/build_core.js ${clean} ${buildDirArg} ${buildTypeArg} ${configArg}`;
-    const cmakeArgsWithTests = cmakeArgs
-        ? `${cmakeArgs} -DASTRARP_BUILD_TESTS=ON`
-        : "-DASTRARP_BUILD_TESTS=ON";
-    buildCoreCmd += ` --cmake-args "${cmakeArgsWithTests}"`;
+    let buildTestsCmd = `node scripts/build_tests.js ${clean} ${buildDirArg} ${buildTypeArg} ${configArg}`;
+    if (cmakeArgs) {
+        buildTestsCmd += ` --cmake-args "${cmakeArgs}"`;
+    }
     if (buildArgs) {
-        buildCoreCmd += ` --build-args "${buildArgs}"`;
+        buildTestsCmd += ` --build-args "${buildArgs}"`;
     }
 
     let testOnlyCmd = `node scripts/test_only.js ${buildDirArg} ${configArg}`;
@@ -57,7 +56,7 @@ try {
         testOnlyCmd += ` --ctest-args "${ctestArgs}"`;
     }
 
-    run(buildCoreCmd, rootDir);
+    run(buildTestsCmd, rootDir);
     run(testOnlyCmd, rootDir);
 } catch (err) {
     console.error("\n❌ Test rebuild failed:", err.message);
