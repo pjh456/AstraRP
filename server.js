@@ -198,6 +198,9 @@ try {
         for (const client of logClients) {
             // 确保连接处于打开状态才发送，避免阻塞报错
             if (client.readyState === WebSocket.OPEN) {
+                if (client.bufferedAmount > 1024 * 1024) {
+                    continue;
+                }
                 client.send(logEntry);
             }
         }
