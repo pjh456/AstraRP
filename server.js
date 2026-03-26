@@ -145,16 +145,20 @@ const loraUpload = multer({
 });
 
 const safeName = (name) => String(name || '').replace(/[^a-zA-Z0-9._-]/g, '_');
+const sendApiError = (res, code, stage, error, status = 400) => {
+    const message = error instanceof Error ? error.message : String(error || 'Unknown error');
+    return res.status(status).json({ error: message, code, stage });
+};
 
 app.post('/api/lora/upload', loraUpload.single('loraFile'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'Missing loraFile' });
+            return sendApiError(res, 'LORA_FILE_MISSING', 'lora.upload', 'Missing loraFile', 400);
         }
 
         const fileName = safeName(req.file.originalname || 'adapter.gguf');
         if (!fileName.toLowerCase().endsWith('.gguf')) {
-            return res.status(400).json({ error: 'LoRA file must be .gguf' });
+            return sendApiError(res, 'LORA_FILE_INVALID', 'lora.upload', 'LoRA file must be .gguf', 400);
         }
 
         const loraName = safeName(req.body?.loraName || fileName.replace(/\.gguf$/i, ''));
@@ -164,7 +168,7 @@ app.post('/api/lora/upload', loraUpload.single('loraFile'), async (req, res) => 
         return res.json({ loraName, loraPath: targetPath });
     } catch (error) {
         console.error('LoRA upload failed:', error);
-        return res.status(500).json({ error: 'LoRA upload failed' });
+        return sendApiError(res, 'LORA_UPLOAD_FAILED', 'lora.upload', 'LoRA upload failed', 500);
     }
 });
 
@@ -209,7 +213,7 @@ try {
 
 app.get('/api/graph-config', async (_req, res) => {
     if (!graphConnectionConfig.enabled) {
-        return res.status(404).json({ error: 'Graph connection config is disabled in global config.' });
+        return sendApiError(res, 'GRAPH_CONFIG_DISABLED', 'graph.read', 'Graph connection config is disabled in global config.', 404);
     }
 
     try {
@@ -223,8 +227,11 @@ app.get('/api/graph-config', async (_req, res) => {
         });
     } catch (error) {
         const code = error && error.code === 'ENOENT' ? 404 : 500;
+        const message = code === 404 ? 'Graph config file not found.' : 'Failed to read graph config.';
         return res.status(code).json({
-            error: code === 404 ? 'Graph config file not found.' : 'Failed to read graph config.',
+            error: message,
+            code: code === 404 ? 'GRAPH_CONFIG_NOT_FOUND' : 'GRAPH_CONFIG_READ_FAILED',
+            stage: 'graph.read',
             config: {
                 ...graphConnectionConfig,
                 path: graphConnectionConfig.path
@@ -235,17 +242,17 @@ app.get('/api/graph-config', async (_req, res) => {
 
 app.post('/api/graph-config', async (req, res) => {
     if (!graphConnectionConfig.enabled) {
-        return res.status(404).json({ error: 'Graph connection config is disabled in global config.' });
+        return sendApiError(res, 'GRAPH_CONFIG_DISABLED', 'graph.write', 'Graph connection config is disabled in global config.', 404);
     }
     if (!graphConnectionConfig.allowFrontendSave) {
-        return res.status(403).json({ error: 'Saving graph config from frontend is disabled.' });
+        return sendApiError(res, 'GRAPH_CONFIG_SAVE_DISABLED', 'graph.write', 'Saving graph config from frontend is disabled.', 403);
     }
 
     try {
         await writeGraphConfigToFile(req.body || {});
         return res.json({ ok: true, path: graphConnectionConfig.path });
     } catch (error) {
-        return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to save graph config.' });
+        return sendApiError(res, 'GRAPH_CONFIG_SAVE_FAILED', 'graph.write', error instanceof Error ? error.message : 'Failed to save graph config.', 400);
     }
 });
 
@@ -313,7 +320,7 @@ app.post('/api/run', (req, res) => {
         }
     } catch (e) {
         console.error("Pipeline initialization failed (Likely OOM):", e);
-        res.write(JSON.stringify({ error: e.message }) + '\n');
+        res.write(JSON.stringify({ error: e.message, code: 'PIPELINE_INIT_FAILED', stage: 'pipeline.init' }) + '\n');
         res.end();
         safelyInvokePipelineMethod(pipeline, "dispose"); // 兼容无 dispose 版本绑定
         return;
@@ -348,7 +355,7 @@ app.post('/api/run', (req, res) => {
             console.log("Pipeline stopped because client disconnected.");
         } else if (err) {
             console.error("Pipeline Error:", err);
-            res.write(JSON.stringify({ error: err.message }) + '\n');
+            res.write(JSON.stringify({ error: err.message, code: 'PIPELINE_RUN_FAILED', stage: 'pipeline.run' }) + '\n');
         } else {
             console.log("Pipeline Finished.");
             res.write(JSON.stringify({ done: true }) + '\n');
@@ -369,7 +376,11 @@ app.post('/api/run', (req, res) => {
         readGraphConfigFromFile()
             .then((graph) => runWithGraph(graph))
             .catch((error) => {
-                res.write(JSON.stringify({ error: `Failed to auto load graph config: ${error.message || error}` }) + '\n');
+                res.write(JSON.stringify({
+                    error: `Failed to auto load graph config: ${error.message || error}`,
+                    code: 'GRAPH_CONFIG_AUTOLOAD_FAILED',
+                    stage: 'graph.read'
+                }) + '\n');
                 res.end();
             });
         return;
