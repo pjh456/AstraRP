@@ -38,7 +38,11 @@ const loadGlobalConfig = () => {
 };
 
 const globalJsonConfig = loadGlobalConfig();
-const graphConnectionConfig = normalizeGraphConnectionConfig(globalJsonConfig.graph_connection);
+const graphConnectionRaw = {
+    ...(globalJsonConfig.graph_connection || {}),
+    path: process.env.ASTRA_GRAPH_CONFIG_PATH || globalJsonConfig.graph_connection?.path
+};
+const graphConnectionConfig = normalizeGraphConnectionConfig(graphConnectionRaw);
 
 const parseGraphPayload = (raw) => {
     if (!raw || typeof raw !== 'object') {
