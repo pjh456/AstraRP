@@ -182,27 +182,30 @@ namespace astra_rp
             }
 
             Vec<MulPtr<core::Batch>> batches;
-            batches.reserve(tok_size / chunk_size + 1);
+            batches.reserve((tok_size + chunk_size - 1) / chunk_size);
 
-            ASSIGN_OR_RETURN(
-                batch,
-                core::BatchManager::instance()
-                    .acquire(chunk_size, 1)
-                    .map_err(
-                        [&](auto err)
-                        {
-                            return utils::ErrorBuilder()
-                                .pipeline()
-                                .batch_acquire_failed()
-                                .message("Batch acquire failed!")
-                                .wrap(std::move(err))
-                                .build();
-                        }));
-
+            MulPtr<core::Batch> batch;
             for (size_t i = 0; i < tok_size; i += chunk_size)
             {
+                size_t remaining = std::min(chunk_size, tok_size - i);
+
+                ASSIGN_OR_RETURN(
+                    batch,
+                    core::BatchManager::instance()
+                        .acquire(static_cast<int32_t>(remaining), 1)
+                        .map_err(
+                            [&](auto err)
+                            {
+                                return utils::ErrorBuilder()
+                                    .pipeline()
+                                    .batch_acquire_failed()
+                                    .message("Batch acquire failed!")
+                                    .wrap(std::move(err))
+                                    .build();
+                            }));
+
                 batch->clear();
-                for (size_t j = 0; j < chunk_size; ++j)
+                for (size_t j = 0; j < remaining; ++j)
                 {
                     auto idx = i + j;
                     bool require_logits = (idx == tok_size - 1);
