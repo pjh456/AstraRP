@@ -52,6 +52,11 @@ namespace astra_rp
             auto json = parser.parse();
             auto json_obj = json.get()->as_object();
 
+            if (json_obj->contains("config_version"))
+            {
+                m_data.config_version = json["config_version"].as_int();
+            }
+
             PARAM_CHECKER(json_obj, model_dir, ResultV<void>);
             m_data.model_dir = json["model_dir"].as_str();
 

@@ -13,6 +13,7 @@ namespace astra_rp
     {
         struct GlobalConfigData
         {
+            int32_t config_version = 1;
             Str model_dir = "./models";
             ModelParams model_params =
                 ModelParamsBuilder("default").build();
