@@ -56,18 +56,8 @@ jobs:
       - name: Setup project
         run: npm run setup
 
-      - name: Build addon
-        run: npm run build:addon
-        env:
-          CCACHE_DIR: /home/runner/.ccache
-          CCACHE_BASEDIR: /home/runner/work/AstraRP/AstraRP
-          CCACHE_COMPILERCHECK: content
-          CMAKE_GENERATOR: Ninja
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
-
-      - name: Build core
-        run: npm run build:core
+      - name: Build core + addon
+        run: npm run build
         env:
           CCACHE_DIR: /home/runner/.ccache
           CCACHE_BASEDIR: /home/runner/work/AstraRP/AstraRP
