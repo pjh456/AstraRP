@@ -56,8 +56,18 @@ jobs:
       - name: Setup project
         run: npm run setup
 
-      - name: Build core + addon
-        run: npm run build
+      - name: Build addon
+        run: npm run build:addon
+        env:
+          CCACHE_DIR: /home/runner/.ccache
+          CCACHE_BASEDIR: /home/runner/work/AstraRP/AstraRP
+          CCACHE_COMPILERCHECK: content
+          CMAKE_GENERATOR: Ninja
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+
+      - name: Build core
+        run: npm run build:core
         env:
           CCACHE_DIR: /home/runner/.ccache
           CCACHE_BASEDIR: /home/runner/work/AstraRP/AstraRP
@@ -67,7 +77,7 @@ jobs:
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
       - name: Run tests
-        run: npm test
+        run: npm test:only
 
       - name: Install deps (webui)
         run: npm ci --prefix webui
