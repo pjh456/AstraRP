@@ -37,7 +37,15 @@ jobs:
               - 'webui/**'
 
       - name: Install system deps
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake python3
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake python3 ccache
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ matrix.node }}-${{ github.ref_name }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.node }}-
 
       - name: Install deps (root)
         run: npm ci
@@ -47,6 +55,12 @@ jobs:
 
       - name: Build core + addon
         run: npm run build
+        env:
+          CCACHE_DIR: /home/runner/.ccache
+          CCACHE_BASEDIR: /home/runner/work/AstraRP/AstraRP
+          CCACHE_COMPILERCHECK: content
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
       - name: Run tests
         run: npm test
