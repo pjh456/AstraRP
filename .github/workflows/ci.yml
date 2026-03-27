@@ -67,7 +67,7 @@ jobs:
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
       - name: Run tests
-        run: npm test:only
+        run: npm run test:only
 
       - name: Install deps (webui)
         run: npm ci --prefix webui
