@@ -77,7 +77,7 @@ try {
     console.log("[+] Building core with CMake...");
     try {
         run("cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CONFIGURATION_TYPES=Release", coreDir, cmakeEnv);
-        run("cmake --build build --config Release", coreDir, cmakeEnv);
+        run("cmake --build build --config Release --parallel", coreDir, cmakeEnv);
     } catch (e) {
         if (e.message && e.message.includes("is not recognized")) {
             console.error("\n[!] 错误: CMake 找不到！这说明你目前使用的 CMake 可能安装在 MinGW 里。");
