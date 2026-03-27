@@ -85,7 +85,7 @@ try {
             ],
             dependencies: ["<!(node -p \"require('node-addon-api').gyp\")"],
             libraries: libs,
-            cflags_cc: ["-std=c++20", "-O3", "-march=native"],
+            cflags_cc: ["-std=c++20", "-O3", "-march=native", "-fexceptions"],
             defines: ["NAPI_CPP_EXCEPTIONS", "LLAMA_SHARED"],
             msvs_settings: {
                 VCCLCompilerTool: {
