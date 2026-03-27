@@ -88,20 +88,21 @@ set(LLAMA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
 # set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(${LLAMA_DIR})
 
-# 注入环境变量
-file(STRINGS "${CMAKE_SOURCE_DIR}/.env" ENV_LINES)
-
+# 注入环境变量（在 CI 或无 .env 时允许缺失）
 set(ENV_LIST)
+if(EXISTS "${CMAKE_SOURCE_DIR}/.env")
+    file(STRINGS "${CMAKE_SOURCE_DIR}/.env" ENV_LINES)
 
-foreach(line IN LISTS ENV_LINES)
-    string(STRIP "${line}" line)
+    foreach(line IN LISTS ENV_LINES)
+        string(STRIP "${line}" line)
 
-    if(line STREQUAL "" OR line MATCHES "^#")
-        continue()
-    endif()
+        if(line STREQUAL "" OR line MATCHES "^#")
+            continue()
+        endif()
 
-    list(APPEND ENV_LIST "${line}")
-endforeach()
+        list(APPEND ENV_LIST "${line}")
+    endforeach()
+endif()
 
 # 4. 添加可执行程序
 file(GLOB_RECURSE ASTRARP_HEADERS
