@@ -48,6 +48,8 @@ if(MSVC)
     endif()
 else()
     # Linux / macOS (GCC/Clang) 优化
+    # 生成可用于共享库的静态库（Node addon 需要 -fPIC）
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
     add_link_options(
         -static-libgcc
         -static-libstdc++
