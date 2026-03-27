@@ -12,9 +12,6 @@ concurrency:
 jobs:
   build-test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node: [20]
 
     steps:
       - name: Checkout (with submodules)
@@ -25,7 +22,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 20
           cache: "npm"
 
       - name: Detect changed paths
@@ -43,13 +40,19 @@ jobs:
       - name: Set build parallelism
         run: echo "CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)" >> $GITHUB_ENV
 
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ matrix.node }}-${{ github.ref_name }}
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
           restore-keys: |
-            ccache-${{ runner.os }}-${{ matrix.node }}-
+            ccache-${{ runner.os }}-
 
       - name: Install deps (root)
         run: npm ci
